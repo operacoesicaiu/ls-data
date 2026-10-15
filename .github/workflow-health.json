@@ -1,0 +1,8 @@
+{
+  "company": "Loja do Sapo",
+  "branch": "main",
+  "workflows": [
+    { "file": "sheets-sync.yml", "name": "Sheets Sync", "maxAgeHours": 11 },
+    { "file": "repository-heartbeat.yml", "name": "Repository Heartbeat", "maxAgeHours": 144 }
+  ]
+}
