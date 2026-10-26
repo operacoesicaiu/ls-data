@@ -273,6 +273,78 @@ function cellValue(value) {
   return typeof value === "object" ? JSON.stringify(value) : value;
 }
 
+function personIds(value) {
+  let parsed = value;
+  if (typeof parsed === "string") {
+    const source = parsed.trim();
+    if (!source) return [];
+    try { parsed = JSON.parse(source); } catch { return [source]; }
+  }
+  const items = Array.isArray(parsed) ? parsed : [parsed];
+  return [...new Set(items.flatMap((item) => {
+    if (typeof item === "string" || typeof item === "number") return [String(item).trim()].filter(Boolean);
+    if (!item || typeof item !== "object") return [];
+    const id = item.id ?? item.person_id ?? item.personId ?? item.person?.id;
+    return id == null ? [] : [String(id).trim()].filter(Boolean);
+  }))];
+}
+
+function phoneFromPerson(person) {
+  const source = person?.person || person?.result || person?.data || person;
+  for (const candidate of [source?.whatsapps, source?.phones, source?.phone, source?.whatsapp]) {
+    const values = Array.isArray(candidate) ? candidate : [candidate];
+    for (const value of values) {
+      const raw = typeof value === "string" || typeof value === "number"
+        ? String(value)
+        : value && typeof value === "object"
+          ? value.phone ?? value.number ?? value.value ?? value.whatsapp
+          : "";
+      const digits = String(raw || "").replace(/\D/g, "");
+      if (digits.length >= 10 && digits.length <= 15) return String(raw).trim();
+    }
+  }
+  return "";
+}
+
+async function enrichCardPhones({ cards, hablla, workspaceId, concurrency = 8 }) {
+  const ids = [...new Set(cards
+    .filter((card) => !phoneFromPerson(card))
+    .flatMap((card) => personIds(card.persons)))];
+  const phonesById = new Map();
+  let next = 0;
+  let missing = 0;
+  const worker = async () => {
+    while (next < ids.length) {
+      const id = ids[next++];
+      try {
+        const response = await hablla.get(`/v1/workspaces/${workspaceId}/persons/${encodeURIComponent(id)}`);
+        phonesById.set(id, phoneFromPerson(response?.data));
+      } catch (error) {
+        if (Number(error?.response?.status) === 404 || /status=404\b/.test(String(error?.message || ""))) {
+          phonesById.set(id, "");
+          missing += 1;
+          continue;
+        }
+        throw error;
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(Math.max(1, concurrency), ids.length) }, worker));
+  let cardsWithPhone = 0;
+  for (const card of cards) {
+    if (phoneFromPerson(card)) {
+      cardsWithPhone += 1;
+      continue;
+    }
+    const associatedPhone = personIds(card.persons).map((id) => phonesById.get(id)).find(Boolean) || "";
+    if (associatedPhone) {
+      card.phone = associatedPhone;
+      cardsWithPhone += 1;
+    }
+  }
+  return { personIds: ids.length, peopleNotFound: missing, cardsWithPhone };
+}
+
 function columnLetter(index) {
   let value = index + 1;
   let result = "";
@@ -461,6 +533,12 @@ async function run() {
         passes,
         attempts,
       });
+      const phoneSummary = await enrichCardPhones({
+        cards,
+        hablla,
+        workspaceId: HABLLA_WORKSPACE_ID,
+      });
+      log(`Telefones Hablla: ${phoneSummary.cardsWithPhone}/${cards.length} cards; ${phoneSummary.personIds} pessoas consultadas; ${phoneSummary.peopleNotFound} IDs sem cadastro.`);
       const existingHeaderRows = await sheets.getValues(
         "'Base Hablla Card'!A1:ZZ1",
       );
@@ -584,9 +662,12 @@ module.exports._internals = {
   assertEmptyAttendantDaysAreSafe,
   booleanOption,
   buildCardSheet,
+  enrichCardPhones,
   collectCardSnapshots,
   completedDayRanges,
   discoverCardHeaders,
+  personIds,
+  phoneFromPerson,
   selectedDatasets,
   shouldReplaceCardRow,
 };

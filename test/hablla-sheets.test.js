@@ -9,6 +9,7 @@ const {
   collectCardSnapshots,
   completedDayRanges,
   discoverCardHeaders,
+  enrichCardPhones,
   selectedDatasets,
   shouldReplaceCardRow,
   CARD_HEADERS,
@@ -155,4 +156,45 @@ test('linhas escrevem os dois telefones e preservam o cabecalho existente', () =
   assert.equal(rows[0][header.indexOf('card.source_detail')], 'landing page');
   assert.equal(rows[0][header.indexOf('custom_field.custom-extra-id')], 'extra-value');
   assert.equal(rows[0].length, header.length);
+});
+
+test('enriquece telefone do card pelo cadastro associado em persons e deduplica consultas', async () => {
+  const cards = [
+    { id: 'card-1', persons: '["person-1"]', custom_fields: [] },
+    { id: 'card-2', persons: ['person-1'], custom_fields: [] },
+    { id: 'card-3', persons: [{ id: 'person-2' }], phone: '+5511999998888' },
+  ];
+  const calls = [];
+  const summary = await enrichCardPhones({
+    cards,
+    workspaceId: 'workspace',
+    hablla: {
+      get: async (path) => {
+        calls.push(path);
+        return { data: { phones: [{ phone: '+55 31 98888-7777' }] } };
+      },
+    },
+  });
+
+  assert.deepEqual(calls.sort(), [
+    '/v1/workspaces/workspace/persons/person-1',
+  ]);
+  assert.equal(cards[0].phone, '+55 31 98888-7777');
+  assert.equal(cards[1].phone, '+55 31 98888-7777');
+  assert.equal(cards[2].phone, '+5511999998888');
+  const { header, rows } = buildCardSheet(cards, CARD_HEADERS);
+  assert.equal(rows[0][header.indexOf('Telefone')], '+55 31 98888-7777');
+  assert.equal(rows[1][header.indexOf('Telefone')], '+55 31 98888-7777');
+  assert.deepEqual(summary, { personIds: 1, peopleNotFound: 0, cardsWithPhone: 3 });
+});
+
+test('ID de pessoa sem cadastro continua sem telefone e conta como ausente', async () => {
+  const cards = [{ id: 'card-1', persons: ['missing-person'] }];
+  const summary = await enrichCardPhones({
+    cards,
+    workspaceId: 'workspace',
+    hablla: { get: async () => { throw new Error('Hablla API falhou: status=404 code=unknown'); } },
+  });
+  assert.equal(cards[0].phone, undefined);
+  assert.deepEqual(summary, { personIds: 1, peopleNotFound: 1, cardsWithPhone: 0 });
 });
