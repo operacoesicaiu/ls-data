@@ -143,6 +143,13 @@ async function main() {
   const sheetFinishedInWindow = sheetCardsInWindow.filter((card) => card.finishedAt !== "").length;
   const sheetSapoCampaign = sheetCardsInWindow.filter((card) => card.list === SAPO_DISPARO_LIST && /ativo de desconto/i.test(card.name));
   const sheetSapoCampaignPhone = sheetSapoCampaign.filter((card) => /\d{10,}/.test(`${card.phone} ${card.customPhone}`)).length;
+  const apiSapoListWindow = cards.filter((card) => listId(card.list) === SAPO_DISPARO_LIST && card.created_at >= cutoff.toISOString());
+  const apiSapoListFinishedWindow = apiSapoListWindow.filter((card) => Boolean(card.finished_at));
+  const apiSapoListFinishedNameWindow = apiSapoListFinishedWindow.filter((card) => /ativo de desconto/i.test(String(card.name || "")));
+  const apiSapoListFinishedNameWindowWithSheetPhone = apiSapoListFinishedNameWindow.filter((card) => {
+    const row = sheetCards.find((candidate) => candidate.id === String(card.id));
+    return row && /\d{10,}/.test(`${row.phone} ${row.customPhone}`);
+  }).length;
   const sheetOnlyIds = sheetCardsInWindow.filter((card) => !apiCardsById.has(card.id));
   const apiIdsInSheetWhole = [...apiCardsById.keys()].filter((id) => sheetIdCounts.has(id)).length;
 
@@ -166,6 +173,7 @@ async function main() {
       sheetSapoDisparoNamedAtivoDescontoSinceStart: sheetSapoCampaign.length,
       sheetSapoDisparoNamedAtivoDescontoWithPhone: sheetSapoCampaignPhone,
       sheetSapoDisparoNamedAtivoDescontoFinished: sheetSapoCampaign.filter((card) => card.finishedAt !== "").length,
+      sheetSapoListWindowFinishedAtRows: sheetCardsInWindow.filter((card) => card.list === SAPO_DISPARO_LIST && card.finishedAt !== "").length,
       sheetOnlyCardCreatedDayMin: sheetOnlyIds.length ? Math.min(...sheetOnlyIds.map((card) => card.createdDay)) : null,
       sheetOnlyCardCreatedDayMax: sheetOnlyIds.length ? Math.max(...sheetOnlyIds.map((card) => card.createdDay)) : null,
       apiCardsCreatedSinceStartAlsoFoundAnywhereInSheet: apiIdsInSheetWhole,
@@ -180,6 +188,12 @@ async function main() {
       apiFinishedAtFilled: sapoCampaignFinished,
       apiCreatedSinceCutoff: sapoCampaignWindow,
       apiWithPhone: sapoCampaignWithPhone,
+    },
+    sapoNexusFilterPipeline: {
+      cardsCreatedSinceCutoffInTargetList: apiSapoListWindow.length,
+      thoseWithFinishedAt: apiSapoListFinishedWindow.length,
+      finishedAndNamedAtivoDesconto: apiSapoListFinishedNameWindow.length,
+      finishedAndNamedAtivoDescontoWithSheetPhone: apiSapoListFinishedNameWindowWithSheetPhone,
     },
     note: "API window uses the same bounded updated_at pagination as Sheets sync; counts deduplicated by card id.",
     campaignListId: CAMPAIGN_LIST,
