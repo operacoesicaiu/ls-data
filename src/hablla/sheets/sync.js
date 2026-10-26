@@ -338,7 +338,7 @@ function enrichCardPhones(cards, people) {
   return { people: peopleById.size, peopleWithPhone, linkedPeopleMissing, cardsWithPhone };
 }
 
-async function fetchPeopleForRange(hablla, workspaceId, range) {
+async function fetchPeopleForRange(hablla, workspaceId, range, targetIds = null) {
   const maxPages = positiveInteger(
     process.env.HABLLA_CLIENTS_MAX_PAGES,
     2000,
@@ -369,6 +369,7 @@ async function fetchPeopleForRange(hablla, workspaceId, range) {
     for (const person of people) {
       if (!person.id) throw new Error("Hablla retornou pessoa sem id");
       const id = String(person.id);
+      if (targetIds && !targetIds.has(id)) continue;
       const updatedAt = new Date(person.updated_at || person.created_at).getTime();
       const previous = peopleById.get(id);
       const previousUpdatedAt = previous
@@ -381,40 +382,7 @@ async function fetchPeopleForRange(hablla, workspaceId, range) {
       completed = true;
       break;
     }
-  }
-  if (!completed) throw new Error(`Hablla atingiu o limite seguro de ${maxPages} paginas de pessoas`);
-  return [...peopleById.values()];
-}
-
-async function fetchAllPeople(hablla, workspaceId) {
-  const maxPages = positiveInteger(process.env.HABLLA_CLIENTS_MAX_PAGES, 2000, "HABLLA_CLIENTS_MAX_PAGES");
-  const peopleById = new Map();
-  const fingerprints = new Set();
-  let completed = false;
-  for (let page = 1; page <= maxPages; page += 1) {
-    const response = await hablla.get(`/v1/workspaces/${workspaceId}/persons`, {
-      params: { page, limit: 50, populate: true },
-    });
-    const people = extractPeople(response.data);
-    if (!people.length) {
-      completed = true;
-      break;
-    }
-    const fingerprint = `${people.length}:${people[0]?.id || ""}:${people.at(-1)?.id || ""}`;
-    if (fingerprints.has(fingerprint)) throw new Error("Hablla repetiu uma pagina de pessoas");
-    fingerprints.add(fingerprint);
-    for (const person of people) {
-      if (!person.id) throw new Error("Hablla retornou pessoa sem id");
-      const id = String(person.id);
-      const updatedAt = new Date(person.updated_at || person.created_at).getTime();
-      const previous = peopleById.get(id);
-      const previousUpdatedAt = previous
-        ? new Date(previous.updated_at || previous.created_at).getTime()
-        : Number.NEGATIVE_INFINITY;
-      if (!Number.isFinite(updatedAt)) throw new Error("Hablla retornou pessoa sem data valida");
-      if (!previous || updatedAt >= previousUpdatedAt) peopleById.set(id, person);
-    }
-    if (people.length < 50) {
+    if (targetIds && peopleById.size === targetIds.size) {
       completed = true;
       break;
     }
@@ -423,12 +391,18 @@ async function fetchAllPeople(hablla, workspaceId) {
   return [...peopleById.values()];
 }
 
-async function fetchPeopleForCardWindow(hablla, workspaceId, days, now = new Date(), exhaustive = false) {
-  if (exhaustive) return fetchAllPeople(hablla, workspaceId);
-  const ranges = personDateRanges(days, now);
+async function fetchPeopleForCardWindow(hablla, workspaceId, cards, days, now = new Date(), exhaustive = false) {
+  const targetIds = new Set((cards || [])
+    .filter((card) => !phoneFromPerson(card))
+    .flatMap((card) => personIds(card.persons)));
+  if (!targetIds.size) return [];
+  const lookbackDays = exhaustive
+    ? positiveInteger(process.env.HABLLA_PEOPLE_LOOKBACK_DAYS, 730, "HABLLA_PEOPLE_LOOKBACK_DAYS")
+    : days;
+  const ranges = personDateRanges(lookbackDays, now).reverse();
   const peopleById = new Map();
   for (const range of ranges) {
-    const people = await fetchPeopleForRange(hablla, workspaceId, range);
+    const people = await fetchPeopleForRange(hablla, workspaceId, range, targetIds);
     for (const person of people) {
       const id = String(person.id);
       const current = peopleById.get(id);
@@ -438,6 +412,7 @@ async function fetchPeopleForCardWindow(hablla, workspaceId, days, now = new Dat
         : Number.NEGATIVE_INFINITY;
       if (!current || updatedAt >= currentUpdatedAt) peopleById.set(id, person);
     }
+    if (peopleById.size === targetIds.size) break;
   }
   return [...peopleById.values()];
 }
@@ -631,10 +606,13 @@ async function run() {
         attempts,
       });
       const peopleExhaustive = booleanOption(process.env.HABLLA_PEOPLE_EXHAUSTIVE, false, "HABLLA_PEOPLE_EXHAUSTIVE");
+      const peopleLookbackDays = peopleExhaustive
+        ? positiveInteger(process.env.HABLLA_PEOPLE_LOOKBACK_DAYS, 730, "HABLLA_PEOPLE_LOOKBACK_DAYS")
+        : cardDays;
       log(peopleExhaustive
-        ? "Buscando todas as pessoas Hablla por paginas..."
+        ? `Buscando pessoas Hablla por dia ate ${peopleLookbackDays} dias atras para resolver IDs antigos...`
         : `Buscando pessoas Hablla por dia na janela de ${cardDays} dias...`);
-      const people = await fetchPeopleForCardWindow(hablla, HABLLA_WORKSPACE_ID, cardDays, new Date(), peopleExhaustive);
+      const people = await fetchPeopleForCardWindow(hablla, HABLLA_WORKSPACE_ID, cards, cardDays, new Date(), peopleExhaustive);
       const phoneSummary = enrichCardPhones(cards, people);
       log(`Telefones Hablla: ${phoneSummary.cardsWithPhone}/${cards.length} cards; ${phoneSummary.peopleWithPhone}/${phoneSummary.people} pessoas com telefone; ${phoneSummary.linkedPeopleMissing} cards sem pessoa correspondente na janela.`);
       const existingHeaderRows = await sheets.getValues(
@@ -762,7 +740,6 @@ module.exports._internals = {
   buildCardSheet,
   enrichCardPhones,
   fetchPeopleForRange,
-  fetchAllPeople,
   fetchPeopleForCardWindow,
   personDateRanges,
   collectCardSnapshots,

@@ -21,10 +21,15 @@ on:
         default: false
         type: boolean
       people_exhaustive:
-        description: "Percorrer toda a lista de pessoas para resolver telefones historicos dos cards"
+        description: "Procurar pessoas antigas ligadas aos cards por consultas diarias"
         required: false
         default: false
         type: boolean
+      people_lookback_days:
+        description: "Dias historicos para procurar pessoas ligadas aos cards"
+        required: false
+        default: "730"
+        type: string
 
 concurrency:
   group: omie-api
@@ -68,6 +73,7 @@ jobs:
           HABLLA_CARDS_DAYS: ${{ inputs.cards_days || vars.HABLLA_CARDS_DAYS || '7' }}
           HABLLA_CARDS_EXHAUSTIVE: ${{ inputs.cards_exhaustive || 'false' }}
           HABLLA_PEOPLE_EXHAUSTIVE: ${{ inputs.people_exhaustive || 'false' }}
+          HABLLA_PEOPLE_LOOKBACK_DAYS: ${{ inputs.people_lookback_days || '730' }}
           HABLLA_SHEETS_DATASETS: ${{ inputs.cards_only && 'cards' || vars.HABLLA_SHEETS_DATASETS || 'cards,attendants' }}
           HABLLA_CARDS_MAX_PAGES: ${{ vars.HABLLA_CARDS_MAX_PAGES || '2000' }}
           HABLLA_CLIENTS_MAX_PAGES: ${{ vars.HABLLA_CLIENTS_MAX_PAGES || '2000' }}
