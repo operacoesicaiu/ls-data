@@ -204,7 +204,10 @@ async function main() {
       }) || "";
       return { data: card.created_at, dispositivo: sheet?.device || "", servico: sheet?.service || "", motivoContato: sheet?.contactReason || "", estagioId: SAPO_DISPARO_LIST, setorId: "", agendamento: "", listaAw: "", nome: card.name || "", telefone: sheet?.phone || card.phone || "", telefoneFallback: fallback };
     });
-  const apiFunnel = buildDisparoBase({ sourceRows: apiRowsForNexus, erpRows: [], billingRows: [], startDate: fromDate, endDate: process.env.AUDIT_END_DATE || "2026-10-26", filters, companyId: "loja-do-sapo" });
+  const apiFunnel = buildDisparoBase({ sourceRows: apiRowsForNexus, erpRows: [], billingRows: [], startDate: fromDate, endDate: process.env.AUDIT_END_DATE || "2026-10-26", filters, companyId: "loja-do-sapo" });  const apiFilteredIds = new Set(apiFunnel.rows.map((row) => String(row[8] || "")));
+  const sheetFinalIds = new Set(sheetFunnel.rows.map((row) => String(row[8] || "")));
+  const rowByApiId = new Map(apiRowsForNexus.map((row) => [String(row.id || ""), row]));
+  const sheetFinalCards = sheetFunnel.rows.map((row) => ({ phone: row[1], date: row[2], device: row[3], service: row[4], reason: row[5], stage: row[6], name: row[0] }));
   console.log(JSON.stringify({
     audit: "read-only Hablla card count; no sheet writes",
     sheetDateParsed,
@@ -240,6 +243,7 @@ async function main() {
       exactNexusUniquePhones: sheetFunnel.rows.length,
       apiEquivalentNexusFilterFunnel: apiFunnel.summary,
       apiEquivalentNexusUniquePhones: apiFunnel.rows.length,
+      apiFinalPhonesAbsentFromSheet: [...apiFunnel.rows].filter((row) => ![...sheetFunnel.rows].some((sheetRow) => String(sheetRow[1]).replace(/\\D/g, "") === String(row[1]).replace(/\\D/g, ""))).map((row) => ({ phone: row[1], name: row[0], date: row[2], device: row[3], service: row[4], reason: row[5] })),
     },
     withPhoneOnCardOrPhoneCustomField: withPhone,
     finishedAtFilled: finished,
