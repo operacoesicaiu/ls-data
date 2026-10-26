@@ -67,7 +67,7 @@ async function main() {
   const sheetId = process.env.HABLLA_SPREADSHEET_ID;
   if (!sheetId) throw new Error("HABLLA_SPREADSHEET_ID ausente");
   const googleToken = await getGoogleAccessToken();
-  const ranges = ["'Base Hablla Card'!B2:B", "'Base Hablla Card'!C2:C", "'Base Hablla Card'!E2:E", "'Base Hablla Card'!F2:F", "'Base Hablla Card'!G2:G", "'Base Hablla Card'!H2:H", "'Base Hablla Card'!I2:I", "'Base Hablla Card'!J2:J", "'Base Hablla Card'!N2:N", "'Base Hablla Card'!O2:O", "'Base Hablla Card'!S2:S", "'Base Hablla Card'!T2:T"];
+  const ranges = ["'Base Hablla Card'!B2:B", "'Base Hablla Card'!C2:C", "'Base Hablla Card'!E2:E", "'Base Hablla Card'!F2:F", "'Base Hablla Card'!G2:G", "'Base Hablla Card'!H2:H", "'Base Hablla Card'!I2:I", "'Base Hablla Card'!J2:J", "'Base Hablla Card'!N2:N", "'Base Hablla Card'!O2:O", "'Base Hablla Card'!Q2:Q", "'Base Hablla Card'!S2:S", "'Base Hablla Card'!T2:T"];
   const query = new URLSearchParams({ majorDimension: "ROWS", valueRenderOption: "UNFORMATTED_VALUE", dateTimeRenderOption: "SERIAL_NUMBER" });
   for (const range of ranges) query.append("ranges", range);
   const sheetResponse = await axios.get(
@@ -100,10 +100,13 @@ async function main() {
       updatedDay: sheetSerialDay(sheetColumn("C", index)),
       list: String(sheetColumn("E", index) || "").trim(),
       customPhone: fallback,
+      customField1: String(sheetColumn("F", index) || ""),
+      customField2: String(sheetColumn("G", index) || ""),
+      customField3: String(sheetColumn("H", index) || ""),
       device: String(sheetColumn("F", index) || ""),
-      service: String(sheetColumn("H", index) || ""),
+      service: String(sheetColumn("G", index) || ""),
       description: String(sheetColumn("J", index) || ""),
-      contactReason: "",
+      contactReason: String(sheetColumn("Q", index) || ""),
       name: String(sheetColumn("I", index) || ""),
       finishedAt: sheetColumn("N", index),
       phone: String(sheetColumn("S", index) || ""),
@@ -272,5 +275,7 @@ main().catch((error) => {
   console.error(`Hablla audit failed: ${error.message}`);
   process.exitCode = 1;
 });
+
+
 
 
