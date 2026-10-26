@@ -52,10 +52,11 @@ async function main() {
   if (!sheetId) throw new Error("HABLLA_SPREADSHEET_ID ausente");
   const googleToken = await getGoogleAccessToken();
   const ranges = ["'Base Hablla Card'!B2:B", "'Base Hablla Card'!E2:E", "'Base Hablla Card'!N2:N", "'Base Hablla Card'!O2:O"];
+  const query = new URLSearchParams({ majorDimension: "ROWS", valueRenderOption: "UNFORMATTED_VALUE", dateTimeRenderOption: "SERIAL_NUMBER" });
+  for (const range of ranges) query.append("ranges", range);
   const sheetResponse = await axios.get(
-    `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sheetId)}/values:batchGet`,
+    `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sheetId)}/values:batchGet?${query.toString()}`,
     {
-      params: { ranges, majorDimension: "ROWS", valueRenderOption: "UNFORMATTED_VALUE", dateTimeRenderOption: "SERIAL_NUMBER" },
       headers: { Authorization: `Bearer ${googleToken}` },
       timeout: 60000,
     },
