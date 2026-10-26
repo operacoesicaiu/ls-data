@@ -338,7 +338,7 @@ function enrichCardPhones(cards, people) {
   return { people: peopleById.size, peopleWithPhone, linkedPeopleMissing, cardsWithPhone };
 }
 
-async function fetchPeopleForRange(hablla, workspaceId, range, targetIds = null) {
+async function fetchPeopleForRange(hablla, workspaceId, range, targetIds = null, fieldDate = "created_at") {
   const maxPages = positiveInteger(
     process.env.HABLLA_CLIENTS_MAX_PAGES,
     2000,
@@ -354,7 +354,7 @@ async function fetchPeopleForRange(hablla, workspaceId, range, targetIds = null)
         end_date: range.end,
         page,
         limit: 50,
-        field_date: "created_at",
+        field_date: fieldDate,
         populate: true,
       },
     });
@@ -391,28 +391,27 @@ async function fetchPeopleForRange(hablla, workspaceId, range, targetIds = null)
   return [...peopleById.values()];
 }
 
-async function fetchPeopleForCardWindow(hablla, workspaceId, cards, days, now = new Date(), exhaustive = false) {
+async function fetchPeopleForCardWindow(hablla, workspaceId, cards, days, now = new Date()) {
   const targetIds = new Set((cards || [])
     .filter((card) => !phoneFromPerson(card))
     .flatMap((card) => personIds(card.persons)));
   if (!targetIds.size) return [];
-  const lookbackDays = exhaustive
-    ? positiveInteger(process.env.HABLLA_PEOPLE_LOOKBACK_DAYS, 730, "HABLLA_PEOPLE_LOOKBACK_DAYS")
-    : days;
-  const ranges = personDateRanges(lookbackDays, now).reverse();
   const peopleById = new Map();
-  for (const range of ranges) {
-    const people = await fetchPeopleForRange(hablla, workspaceId, range, targetIds);
-    for (const person of people) {
-      const id = String(person.id);
-      const current = peopleById.get(id);
-      const updatedAt = new Date(person.updated_at || person.created_at).getTime();
-      const currentUpdatedAt = current
-        ? new Date(current.updated_at || current.created_at).getTime()
-        : Number.NEGATIVE_INFINITY;
-      if (!current || updatedAt >= currentUpdatedAt) peopleById.set(id, person);
+  const ranges = personDateRanges(days, now).reverse();
+  for (const fieldDate of ["created_at", "updated_at"]) {
+    for (const range of ranges) {
+      const people = await fetchPeopleForRange(hablla, workspaceId, range, targetIds, fieldDate);
+      for (const person of people) {
+        const id = String(person.id);
+        const current = peopleById.get(id);
+        const updatedAt = new Date(person.updated_at || person.created_at).getTime();
+        const currentUpdatedAt = current
+          ? new Date(current.updated_at || current.created_at).getTime()
+          : Number.NEGATIVE_INFINITY;
+        if (!current || updatedAt >= currentUpdatedAt) peopleById.set(id, person);
+      }
+      if (peopleById.size === targetIds.size) break;
     }
-    if (peopleById.size === targetIds.size) break;
   }
   return [...peopleById.values()];
 }
@@ -605,14 +604,8 @@ async function run() {
         passes,
         attempts,
       });
-      const peopleExhaustive = booleanOption(process.env.HABLLA_PEOPLE_EXHAUSTIVE, false, "HABLLA_PEOPLE_EXHAUSTIVE");
-      const peopleLookbackDays = peopleExhaustive
-        ? positiveInteger(process.env.HABLLA_PEOPLE_LOOKBACK_DAYS, 730, "HABLLA_PEOPLE_LOOKBACK_DAYS")
-        : cardDays;
-      log(peopleExhaustive
-        ? `Buscando pessoas Hablla por dia ate ${peopleLookbackDays} dias atras para resolver IDs antigos...`
-        : `Buscando pessoas Hablla por dia na janela de ${cardDays} dias...`);
-      const people = await fetchPeopleForCardWindow(hablla, HABLLA_WORKSPACE_ID, cards, cardDays, new Date(), peopleExhaustive);
+      log(`Buscando pessoas Hablla criadas ou atualizadas na janela de ${cardDays} dias...`);
+      const people = await fetchPeopleForCardWindow(hablla, HABLLA_WORKSPACE_ID, cards, cardDays);
       const phoneSummary = enrichCardPhones(cards, people);
       log(`Telefones Hablla: ${phoneSummary.cardsWithPhone}/${cards.length} cards; ${phoneSummary.peopleWithPhone}/${phoneSummary.people} pessoas com telefone; ${phoneSummary.linkedPeopleMissing} cards sem pessoa correspondente na janela.`);
       const existingHeaderRows = await sheets.getValues(

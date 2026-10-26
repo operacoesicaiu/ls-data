@@ -214,8 +214,9 @@ test('pessoas sao consultadas em janelas diarias, do corte de 60 dias ate agora'
   assert.equal(ranges.at(-1).end, '2026-10-26T15:00:00.000Z');
 });
 
-test('janela de cards busca pessoas por dia e consolida IDs repetidos', async () => {
+test('janela de cards busca pessoas por created_at e updated_at no periodo solicitado', async () => {
   const requestedRanges = [];
+  const requestedFields = [];
   const cards = [
     { id: 'card-1', persons: ['person-1'] },
     { id: 'card-2', persons: ['person-2'] },
@@ -223,9 +224,10 @@ test('janela de cards busca pessoas por dia e consolida IDs repetidos', async ()
   const people = await fetchPeopleForCardWindow({
     get: async (_path, { params }) => {
       requestedRanges.push([params.start_date, params.end_date]);
-      return { data: { results: requestedRanges.length === 1
+      requestedFields.push(params.field_date);
+      return { data: { results: params.field_date === 'created_at' && requestedFields.filter((field) => field === 'created_at').length === 1
         ? [{ id: 'person-1', created_at: '2026-10-26', updated_at: '2026-10-26', phones: [] }]
-        : requestedRanges.length === 2
+        : params.field_date === 'updated_at'
           ? [
               { id: 'person-1', created_at: '2026-10-26', updated_at: '2026-10-26', phones: [{ phone: '+5531999998888' }] },
               { id: 'person-2', created_at: '2026-10-25', updated_at: '2026-10-25', phones: [{ phone: '+5511999998888' }] },
@@ -234,35 +236,25 @@ test('janela de cards busca pessoas por dia e consolida IDs repetidos', async ()
     },
   }, 'workspace', cards, 2, new Date('2026-10-26T15:00:00.000Z'));
 
-  assert.equal(requestedRanges.length, 2);
+  assert.equal(requestedRanges.length, 4);
+  assert.deepEqual(requestedFields, ['created_at', 'created_at', 'created_at', 'updated_at']);
+  assert.ok(requestedRanges.every(([start, end]) => start >= '2026-10-24T03:00:00.000Z' && end <= '2026-10-26T15:00:00.000Z'));
   assert.equal(people.length, 2);
   assert.equal(people[0].phones[0].phone, '+5531999998888');
   assert.equal(people[1].phones[0].phone, '+5511999998888');
 });
 
-test('busca exaustiva procura IDs antigos por janelas diarias sem chamadas individuais', async () => {
-  const previousLookback = process.env.HABLLA_PEOPLE_LOOKBACK_DAYS;
-  process.env.HABLLA_PEOPLE_LOOKBACK_DAYS = '3';
+test('pessoas nunca sao buscadas antes da janela configurada', async () => {
   const calls = [];
-  try {
-    const people = await fetchPeopleForCardWindow({
-      get: async (path, { params }) => {
-        calls.push({ path, params });
-        const results = calls.length === 3
-          ? [{ id: 'older-person', created_at: '2026-10-24', updated_at: '2026-10-24', phones: [{ phone: '+5531999998888' }] }]
-          : [];
-        return { data: { results } };
-      },
-    }, 'workspace', [{ id: 'card-1', persons: ['older-person'] }], 1, new Date('2026-10-26T15:00:00.000Z'), true);
-
-    assert.equal(people.length, 1);
-    assert.equal(calls.length, 3);
-    assert.ok(calls.every(({ path, params }) => path === '/v1/workspaces/workspace/persons' && params.populate === true));
-    assert.ok(calls.every(({ params }) => params.page === 1));
-  } finally {
-    if (previousLookback === undefined) delete process.env.HABLLA_PEOPLE_LOOKBACK_DAYS;
-    else process.env.HABLLA_PEOPLE_LOOKBACK_DAYS = previousLookback;
-  }
+  await fetchPeopleForCardWindow({
+    get: async (path, { params }) => {
+      calls.push({ path, params });
+      return { data: { results: [] } };
+    },
+  }, 'workspace', [{ id: 'older-person', persons: ['older-person'] }], 1, new Date('2026-10-26T15:00:00.000Z'));
+  assert.ok(calls.length > 0);
+  assert.ok(calls.every(({ params }) => params.start_date >= '2026-10-25T03:00:00.000Z'));
+  assert.ok(calls.every(({ params }) => ['created_at', 'updated_at'].includes(params.field_date)));
 });
 
 test('contabiliza card cujo ID nao veio na janela de pessoas e nao inventa telefone', () => {
