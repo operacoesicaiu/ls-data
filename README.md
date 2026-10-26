@@ -221,6 +221,7 @@ npm test
 | `HABLLA_CARDS_CRAWL_ATTEMPTS` | `1` | Reinícios de uma coleta inconsistente. |
 | `HABLLA_CARDS_PRESERVE_UNFETCHED` | `true` | Não apaga cards ausentes de uma coleta parcial. |
 | `HABLLA_CLIENTS_MAX_PAGES` | `2000` | Teto seguro da paginação de pessoas usada para preencher telefones associados aos cards. |
+| `HABLLA_PEOPLE_EXHAUSTIVE` | `false` | Lê todas as pessoas, sem corte de data; use em backfills manuais para resolver IDs antigos. |
 | `HABLLA_SHEETS_DATASETS` | `cards,attendants` | Permite executar somente um destino em recuperação local. |
 | `HABLLA_SHEETS_ATTENDANTS_DAYS` | `1` | Dias concluídos de atendentes, consultados separadamente. |
 | `HABLLA_SHEETS_ALLOW_EMPTY_REPLACEMENT` | `false` | Override explícito para limpar uma janela vazia. |

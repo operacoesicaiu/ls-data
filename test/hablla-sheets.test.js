@@ -11,6 +11,7 @@ const {
   discoverCardHeaders,
   enrichCardPhones,
   fetchPeopleForRange,
+  fetchAllPeople,
   fetchPeopleForCardWindow,
   personDateRanges,
   selectedDatasets,
@@ -231,6 +232,24 @@ test('janela de cards busca pessoas por dia e consolida IDs repetidos', async ()
   assert.equal(people.length, 1);
   assert.equal(people[0].updated_at, '2026-10-01');
   assert.equal(people[0].phones[0].phone, '+5531999998888');
+});
+
+test('leitura exaustiva percorre todas as paginas sem filtro de data', async () => {
+  const calls = [];
+  const firstPage = Array.from({ length: 50 }, (_, index) => ({ id: `person-${index}`, created_at: '2025-01-01' }));
+  const lastPage = [{ id: 'older-person', created_at: '2024-01-01' }];
+  const people = await fetchAllPeople({
+    get: async (_path, { params }) => {
+      calls.push(params);
+      return { data: { results: params.page === 1 ? firstPage : lastPage } };
+    },
+  }, 'workspace');
+
+  assert.equal(people.length, 51);
+  assert.deepEqual(calls, [
+    { page: 1, limit: 50, populate: true },
+    { page: 2, limit: 50, populate: true },
+  ]);
 });
 
 test('contabiliza card cujo ID nao veio na janela de pessoas e nao inventa telefone', () => {

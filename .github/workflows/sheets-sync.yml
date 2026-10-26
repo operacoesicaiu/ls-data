@@ -20,6 +20,11 @@ on:
         required: false
         default: false
         type: boolean
+      people_exhaustive:
+        description: "Percorrer toda a lista de pessoas para resolver telefones historicos dos cards"
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: omie-api
@@ -62,8 +67,10 @@ jobs:
           HABLLA_BOARD_ID: ${{ secrets.HABLLA_BOARD_ID }}
           HABLLA_CARDS_DAYS: ${{ inputs.cards_days || vars.HABLLA_CARDS_DAYS || '7' }}
           HABLLA_CARDS_EXHAUSTIVE: ${{ inputs.cards_exhaustive || 'false' }}
+          HABLLA_PEOPLE_EXHAUSTIVE: ${{ inputs.people_exhaustive || 'false' }}
           HABLLA_SHEETS_DATASETS: ${{ inputs.cards_only && 'cards' || vars.HABLLA_SHEETS_DATASETS || 'cards,attendants' }}
           HABLLA_CARDS_MAX_PAGES: ${{ vars.HABLLA_CARDS_MAX_PAGES || '2000' }}
+          HABLLA_CLIENTS_MAX_PAGES: ${{ vars.HABLLA_CLIENTS_MAX_PAGES || '2000' }}
           HABLLA_CARDS_PAGES_WITHOUT_RECENT_CREATED: ${{ vars.HABLLA_CARDS_PAGES_WITHOUT_RECENT_CREATED || '2' }}
           HABLLA_SPREADSHEET_ID: ${{ secrets.HABLLA_SPREADSHEET_ID }}
           HABLLA_COLLABORATORS_SPREADSHEET_ID: ${{ secrets.HABLLA_COLLABORATORS_SPREADSHEET_ID }}
