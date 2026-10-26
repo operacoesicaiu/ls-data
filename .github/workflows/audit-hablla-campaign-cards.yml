@@ -29,6 +29,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Fetch Nexus filter implementation
+        run: git clone --depth 1 https://github.com/operacoesicaiu/nexus.git nexus
       - name: Compare Hablla cards, Sheets, and Nexus filters
         run: node scripts/audit-hablla-campaign-cards.cjs
         env:
@@ -43,5 +45,7 @@ jobs:
           GOOGLE_PRIVATE_KEY: ${{ secrets.GOOGLE_PRIVATE_KEY }}
           HABLLA_MIN_INTERVAL_MS: "150"
           NEXUS_DISPARO_LOG: ${{ secrets.NEXUS_DISPARO_LOG }}
+          NEXUS_DISPARO_MODULE: /home/runner/work/ls-data/ls-data/nexus/functions/_lib/disparo.js
+
 
 

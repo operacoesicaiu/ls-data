@@ -8,7 +8,7 @@ let buildDisparoBasePromise;
 
 async function getBuildDisparoBase() {
   if (!buildDisparoBasePromise) {
-    const modulePath = process.env.NEXUS_DISPARO_MODULE || "D:/Projects/nexus/functions/_lib/disparo.js";
+    const modulePath = process.env.NEXUS_DISPARO_MODULE || `${process.cwd()}/nexus/functions/_lib/disparo.js`;
     buildDisparoBasePromise = import(pathToFileURL(modulePath).href).then((module) => module.buildDisparoBase);
   }
   return buildDisparoBasePromise;
