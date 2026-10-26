@@ -140,19 +140,6 @@ async function main() {
   const sheetSapoCampaign = sheetCardsInWindow.filter((card) => card.list === SAPO_DISPARO_LIST && /ativo de desconto/i.test(card.name));
   const sheetSapoCampaignPhone = sheetSapoCampaign.filter((card) => /\d{10,}/.test(`${card.phone} ${card.customPhone}`)).length;
   const sheetOnlyIds = sheetCardsInWindow.filter((card) => !apiCardsById.has(card.id));
-  let sheetOnlyReturnedByDirectGet = 0;
-  let sheetOnlyNotFoundByDirectGet = 0;
-  let sheetOnlyDirectGetOther = 0;
-  for (const card of sheetOnlyIds) {
-    try {
-      await hablla.get(`/v1/workspaces/${process.env.HABLLA_WORKSPACE_ID}/cards/${encodeURIComponent(card.id)}`);
-      sheetOnlyReturnedByDirectGet += 1;
-    } catch (error) {
-      const status = error?.response?.status;
-      if (status === 404) sheetOnlyNotFoundByDirectGet += 1;
-      else sheetOnlyDirectGetOther += 1;
-    }
-  }
 
   console.log(JSON.stringify({
     audit: "read-only Hablla card count; no sheet writes",
@@ -174,9 +161,8 @@ async function main() {
       sheetSapoDisparoNamedAtivoDescontoSinceStart: sheetSapoCampaign.length,
       sheetSapoDisparoNamedAtivoDescontoWithPhone: sheetSapoCampaignPhone,
       sheetSapoDisparoNamedAtivoDescontoFinished: sheetSapoCampaign.filter((card) => card.finishedAt !== "").length,
-      sheetOnlyCardsReturnedByDirectGet: sheetOnlyReturnedByDirectGet,
-      sheetOnlyCardsNotFoundByDirectGet: sheetOnlyNotFoundByDirectGet,
-      sheetOnlyCardsWithOtherDirectGetStatus: sheetOnlyDirectGetOther,
+      sheetOnlyCardCreatedDayMin: sheetOnlyIds.length ? Math.min(...sheetOnlyIds.map((card) => card.createdDay)) : null,
+      sheetOnlyCardCreatedDayMax: sheetOnlyIds.length ? Math.max(...sheetOnlyIds.map((card) => card.createdDay)) : null,
       sheetOnlyCardsCountedForDirectGet: sheetOnlyIds.length,
     },
     withPhoneOnCardOrPhoneCustomField: withPhone,
