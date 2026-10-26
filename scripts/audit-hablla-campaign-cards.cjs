@@ -67,18 +67,20 @@ async function main() {
   const sheetRowCount = Math.max(0, ...sheetColumns.map((column) => column.length));
   const sheetCards = [];
   const sheetIdCounts = new Map();
+  const sheetColumnsByName = new Map(ranges.map((range, index) => [range.match(/!([A-Z]+)2:/)[1], index]));
+  const sheetColumn = (letter, index) => sheetColumns[sheetColumnsByName.get(letter)]?.[index] ?? "";
   for (let index = 0; index < sheetRowCount; index += 1) {
-    const cardId = String(sheetColumns[3][index] || "").trim();
+    const cardId = String(sheetColumn("O", index) || "").trim();
     if (!cardId) continue;
     sheetIdCounts.set(cardId, (sheetIdCounts.get(cardId) || 0) + 1);
     sheetCards.push({
       id: cardId,
-      createdDay: sheetSerialDay(sheetColumns[0][index]),
-      list: String(sheetColumns[1][index] || "").trim(),
-      customPhone: String(sheetColumns[2][index] || ""),
-      name: String(sheetColumns[3][index] || ""),
-      finishedAt: sheetColumns[4][index],
-      phone: String(sheetColumns[6][index] || sheetColumns[7][index] || ""),
+      createdDay: sheetSerialDay(sheetColumn("C", index)),
+      list: String(sheetColumn("E", index) || "").trim(),
+      customPhone: String(sheetColumn("T", index) || ""),
+      name: String(sheetColumn("I", index) || ""),
+      finishedAt: sheetColumn("N", index),
+      phone: String(sheetColumn("S", index) || ""),
     });
   }
 
@@ -134,7 +136,7 @@ async function main() {
   const apiCardsById = new Map(cards.map((card) => [String(card.id), card]));
   const sheetCardsInWindow = sheetCards.filter((card) => card.createdDay != null && card.createdDay >= cutoffDay);
   const sheetCardsInWindowById = new Map(sheetCardsInWindow.map((card) => [card.id, card]));
-  const matchedIds = [...apiCardsById.keys()].filter((id) => sheetCardsInWindowById.has(id));
+  const matchedIds = [...apiCardsById.keys()].filter((id) => sheetIdCounts.has(id));
   const duplicatedSheetRows = [...sheetIdCounts.values()].reduce((total, count) => total + Math.max(0, count - 1), 0);
   const sheetCampaignList = sheetCardsInWindow.filter((card) => card.list === CAMPAIGN_LIST).length;
   const sheetSapoList = sheetCardsInWindow.filter((card) => card.list === SAPO_DISPARO_LIST).length;
@@ -153,9 +155,9 @@ async function main() {
     totalCardsCreatedSinceStart: cards.length,
     apiSheetComparison: {
       sheetCardRowsWithId: sheetCards.length,
-      sheetCardsCreatedSinceStart: sheetCardsInWindow.length,
+      sheetCardsCreatedSinceStart: sheetCardsInWindowById.size,
       apiCardsMissingFromSheetSinceStart: Math.max(0, cards.length - matchedIds.length),
-      sheetCardsNotReturnedByApiSinceStart: Math.max(0, sheetCardsInWindow.length - matchedIds.length),
+      sheetCardsNotReturnedByApiSinceStart: sheetOnlyIds.length,
       idsMatchedBetweenApiAndSheet: matchedIds.length,
       duplicatedSheetRowsForSameCardId: duplicatedSheetRows,
       sheetCardsWithFinishedAtSinceStart: sheetFinishedInWindow,
