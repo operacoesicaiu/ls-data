@@ -104,7 +104,7 @@ async function main() {
       customField2: String(sheetColumn("G", index) || ""),
       customField3: String(sheetColumn("H", index) || ""),
       device: String(sheetColumn("F", index) || ""),
-      service: String(sheetColumn("G", index) || ""),
+      service: String(sheetColumn("H", index) || ""),
       description: String(sheetColumn("J", index) || ""),
       contactReason: String(sheetColumn("Q", index) || ""),
       name: String(sheetColumn("I", index) || ""),
@@ -202,7 +202,7 @@ async function main() {
         const digits = String(value || "").replace(/\D/g, "");
         return digits.length >= 10 && digits.length <= 13;
       }) || "";
-      return { data: card.created_at, dispositivo: sheet?.device || "", servico: sheet?.service || "", motivoContato: "", estagioId: SAPO_DISPARO_LIST, setorId: "", agendamento: "", listaAw: "", nome: card.name || "", telefone: sheet?.phone || card.phone || "", telefoneFallback: fallback };
+      return { data: card.created_at, dispositivo: sheet?.device || "", servico: sheet?.service || "", motivoContato: sheet?.contactReason || "", estagioId: SAPO_DISPARO_LIST, setorId: "", agendamento: "", listaAw: "", nome: card.name || "", telefone: sheet?.phone || card.phone || "", telefoneFallback: fallback };
     });
   const apiFunnel = buildDisparoBase({ sourceRows: apiRowsForNexus, erpRows: [], billingRows: [], startDate: fromDate, endDate: process.env.AUDIT_END_DATE || "2026-10-26", filters, companyId: "loja-do-sapo" });
   console.log(JSON.stringify({
