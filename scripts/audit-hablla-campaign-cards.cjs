@@ -3,9 +3,16 @@ const collectHabllaCards = require("../src/hablla/card-collector");
 const axios = require("axios");
 const { getGoogleAccessToken } = require("../src/google/auth");
 const saoPauloDayRange = require("../src/hablla/date-range");
-const { createRequire } = require("node:module");
-const nexusRequire = createRequire(`${process.cwd()}/package.json`);
-const { buildDisparoBase } = nexusRequire("./functions/_lib/disparo.js");
+const { pathToFileURL } = require("node:url");
+let buildDisparoBasePromise;
+
+async function getBuildDisparoBase() {
+  if (!buildDisparoBasePromise) {
+    const modulePath = process.env.NEXUS_DISPARO_MODULE || "D:/Projects/nexus/functions/_lib/disparo.js";
+    buildDisparoBasePromise = import(pathToFileURL(modulePath).href).then((module) => module.buildDisparoBase);
+  }
+  return buildDisparoBasePromise;
+}
 
 const CAMPAIGN_LIST = "6a873ec8a02f500d3ab0f07f";
 const SAPO_DISPARO_LIST = "684b0513919fd2dca2e5f343";
@@ -171,6 +178,7 @@ async function main() {
   const sheetOnlyIds = sheetCardsInWindow.filter((card) => !apiCardsById.has(card.id));
   const apiIdsInSheetWhole = [...apiCardsById.keys()].filter((id) => sheetIdCounts.has(id)).length;
   const historicLog = JSON.parse(process.env.NEXUS_DISPARO_LOG || "{}");
+  const buildDisparoBase = await getBuildDisparoBase();
   const filters = historicLog.filters || {
     dispositivos: ["iPhone"], servicos: ["TODOS"], motivosContato: ["Consertar aparelho"],
     estagios: ["TODOS"], setores: ["TODOS"], removerAgendamento: ["Sim"],
