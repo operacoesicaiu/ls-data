@@ -2,6 +2,7 @@ const getHabllaClient = require("../src/hablla/api");
 const collectHabllaCards = require("../src/hablla/card-collector");
 const axios = require("axios");
 const { getGoogleAccessToken } = require("../src/google/auth");
+const saoPauloDayRange = require("../src/hablla/date-range");
 
 const CAMPAIGN_LIST = "6a873ec8a02f500d3ab0f07f";
 const SAPO_DISPARO_LIST = "684b0513919fd2dca2e5f343";
@@ -35,7 +36,7 @@ function sheetSerialDay(value) {
 async function main() {
   const fromDate = process.env.AUDIT_FROM_DATE || "2026-09-28";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fromDate)) throw new Error("AUDIT_FROM_DATE invalida");
-  const cutoff = new Date(`${fromDate}T03:00:00.000Z`);
+  const cutoff = new Date(saoPauloDayRange(0, new Date(`${fromDate}T12:00:00.000Z`)).start);
   const now = new Date();
   if (!Number.isFinite(cutoff.getTime()) || cutoff > now) throw new Error("Janela da auditoria invalida");
 
@@ -45,7 +46,8 @@ async function main() {
     workspaceId: process.env.HABLLA_WORKSPACE_ID,
     boardId: process.env.HABLLA_BOARD_ID,
     cutoff: cutoff.toISOString(),
-    exhaustive: true,
+    exhaustive: false,
+    pagesWithoutRecentCreated: 2,
   });
 
   const sheetId = process.env.HABLLA_SPREADSHEET_ID;
@@ -140,6 +142,7 @@ async function main() {
   const sheetSapoCampaign = sheetCardsInWindow.filter((card) => card.list === SAPO_DISPARO_LIST && /ativo de desconto/i.test(card.name));
   const sheetSapoCampaignPhone = sheetSapoCampaign.filter((card) => /\d{10,}/.test(`${card.phone} ${card.customPhone}`)).length;
   const sheetOnlyIds = sheetCardsInWindow.filter((card) => !apiCardsById.has(card.id));
+  const apiIdsInSheetWhole = [...apiCardsById.keys()].filter((id) => sheetIdCounts.has(id)).length;
 
   console.log(JSON.stringify({
     audit: "read-only Hablla card count; no sheet writes",
@@ -163,6 +166,7 @@ async function main() {
       sheetSapoDisparoNamedAtivoDescontoFinished: sheetSapoCampaign.filter((card) => card.finishedAt !== "").length,
       sheetOnlyCardCreatedDayMin: sheetOnlyIds.length ? Math.min(...sheetOnlyIds.map((card) => card.createdDay)) : null,
       sheetOnlyCardCreatedDayMax: sheetOnlyIds.length ? Math.max(...sheetOnlyIds.map((card) => card.createdDay)) : null,
+      apiCardsCreatedSinceStartAlsoFoundAnywhereInSheet: apiIdsInSheetWhole,
       sheetOnlyCardsCountedForDirectGet: sheetOnlyIds.length,
     },
     withPhoneOnCardOrPhoneCustomField: withPhone,
@@ -175,6 +179,7 @@ async function main() {
       apiCreatedSinceCutoff: sapoCampaignWindow,
       apiWithPhone: sapoCampaignWithPhone,
     },
+    note: "API window uses the same bounded updated_at pagination as Sheets sync; counts deduplicated by card id.",
     campaignListId: CAMPAIGN_LIST,
     cardsInCampaignList: campaignList,
     sapoDisparoListId: SAPO_DISPARO_LIST,
