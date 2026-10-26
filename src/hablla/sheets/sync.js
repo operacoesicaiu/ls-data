@@ -3,7 +3,7 @@ const { backoffMs, sleep } = require("../../lib/http-retry");
 const formatPublicError = require("../../lib/public-error");
 const getHabllaClient = require("../api");
 const collectHabllaCards = require("../card-collector");
-const { extractAttendants } = require("../response-contracts");
+const { extractAttendants, extractPeople } = require("../response-contracts");
 const saoPauloDayRange = require("../date-range");
 
 const CARD_HEADERS = [
@@ -291,7 +291,7 @@ function personIds(value) {
 
 function phoneFromPerson(person) {
   const source = person?.person || person?.result || person?.data || person;
-  for (const candidate of [source?.whatsapps, source?.phones, source?.phone, source?.whatsapp]) {
+  for (const candidate of [source?.phones, source?.whatsapps, source?.phone, source?.whatsapp]) {
     const values = Array.isArray(candidate) ? candidate : [candidate];
     for (const value of values) {
       const raw = typeof value === "string" || typeof value === "number"
@@ -306,43 +306,74 @@ function phoneFromPerson(person) {
   return "";
 }
 
-async function enrichCardPhones({ cards, hablla, workspaceId, concurrency = 8 }) {
-  const ids = [...new Set(cards
-    .filter((card) => !phoneFromPerson(card))
-    .flatMap((card) => personIds(card.persons)))];
-  const phonesById = new Map();
-  let next = 0;
-  let missing = 0;
-  const worker = async () => {
-    while (next < ids.length) {
-      const id = ids[next++];
-      try {
-        const response = await hablla.get(`/v1/workspaces/${workspaceId}/persons/${encodeURIComponent(id)}`);
-        phonesById.set(id, phoneFromPerson(response?.data));
-      } catch (error) {
-        if (Number(error?.response?.status) === 404 || /status=404\b/.test(String(error?.message || ""))) {
-          phonesById.set(id, "");
-          missing += 1;
-          continue;
-        }
-        throw error;
-      }
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(Math.max(1, concurrency), ids.length) }, worker));
+function enrichCardPhones(cards, people) {
+  const peopleById = new Map((people || []).map((person) => [String(person.id), person]));
+  const peopleWithPhone = [...peopleById.values()].filter((person) => phoneFromPerson(person)).length;
   let cardsWithPhone = 0;
+  let linkedPeopleMissing = 0;
   for (const card of cards) {
     if (phoneFromPerson(card)) {
       cardsWithPhone += 1;
       continue;
     }
-    const associatedPhone = personIds(card.persons).map((id) => phonesById.get(id)).find(Boolean) || "";
+    const ids = personIds(card.persons);
+    const linkedPeople = ids.map((id) => peopleById.get(id)).filter(Boolean);
+    if (ids.length && !linkedPeople.length) linkedPeopleMissing += 1;
+    const associatedPhone = linkedPeople.map(phoneFromPerson).find(Boolean) || "";
     if (associatedPhone) {
       card.phone = associatedPhone;
       cardsWithPhone += 1;
     }
   }
-  return { personIds: ids.length, peopleNotFound: missing, cardsWithPhone };
+  return { people: peopleById.size, peopleWithPhone, linkedPeopleMissing, cardsWithPhone };
+}
+
+async function fetchPeopleForRange(hablla, workspaceId, range) {
+  const maxPages = positiveInteger(
+    process.env.HABLLA_CLIENTS_MAX_PAGES,
+    2000,
+    "HABLLA_CLIENTS_MAX_PAGES",
+  );
+  const peopleById = new Map();
+  const fingerprints = new Set();
+  let completed = false;
+  for (let page = 1; page <= maxPages; page += 1) {
+    const response = await hablla.get(`/v1/workspaces/${workspaceId}/persons`, {
+      params: {
+        start_date: range.start,
+        end_date: range.end,
+        page,
+        limit: 50,
+        field_date: "created_at",
+        populate: true,
+      },
+    });
+    const people = extractPeople(response.data);
+    if (!people.length) {
+      completed = true;
+      break;
+    }
+    const fingerprint = `${people.length}:${people[0]?.id || ""}:${people.at(-1)?.id || ""}`;
+    if (fingerprints.has(fingerprint)) throw new Error("Hablla repetiu uma pagina de pessoas");
+    fingerprints.add(fingerprint);
+    for (const person of people) {
+      if (!person.id) throw new Error("Hablla retornou pessoa sem id");
+      const id = String(person.id);
+      const updatedAt = new Date(person.updated_at || person.created_at).getTime();
+      const previous = peopleById.get(id);
+      const previousUpdatedAt = previous
+        ? new Date(previous.updated_at || previous.created_at).getTime()
+        : Number.NEGATIVE_INFINITY;
+      if (!Number.isFinite(updatedAt)) throw new Error("Hablla retornou pessoa sem data valida");
+      if (!previous || updatedAt >= previousUpdatedAt) peopleById.set(id, person);
+    }
+    if (people.length < 50) {
+      completed = true;
+      break;
+    }
+  }
+  if (!completed) throw new Error(`Hablla atingiu o limite seguro de ${maxPages} paginas de pessoas`);
+  return [...peopleById.values()];
 }
 
 function columnLetter(index) {
@@ -533,12 +564,10 @@ async function run() {
         passes,
         attempts,
       });
-      const phoneSummary = await enrichCardPhones({
-        cards,
-        hablla,
-        workspaceId: HABLLA_WORKSPACE_ID,
-      });
-      log(`Telefones Hablla: ${phoneSummary.cardsWithPhone}/${cards.length} cards; ${phoneSummary.personIds} pessoas consultadas; ${phoneSummary.peopleNotFound} IDs sem cadastro.`);
+      log(`Buscando pessoas Hablla criadas entre ${cardRange.start} e ${cardRange.end}...`);
+      const people = await fetchPeopleForRange(hablla, HABLLA_WORKSPACE_ID, cardRange);
+      const phoneSummary = enrichCardPhones(cards, people);
+      log(`Telefones Hablla: ${phoneSummary.cardsWithPhone}/${cards.length} cards; ${phoneSummary.peopleWithPhone}/${phoneSummary.people} pessoas com telefone; ${phoneSummary.linkedPeopleMissing} cards sem pessoa correspondente na janela.`);
       const existingHeaderRows = await sheets.getValues(
         "'Base Hablla Card'!A1:ZZ1",
       );
@@ -663,6 +692,7 @@ module.exports._internals = {
   booleanOption,
   buildCardSheet,
   enrichCardPhones,
+  fetchPeopleForRange,
   collectCardSnapshots,
   completedDayRanges,
   discoverCardHeaders,

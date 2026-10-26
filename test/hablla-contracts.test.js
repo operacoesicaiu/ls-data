@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const {
   extractAttendants,
   extractCards,
+  extractPeople,
 } = require("../src/hablla/response-contracts");
 
 test("contratos Hablla aceitam somente listas explicitas observadas", () => {
@@ -12,6 +13,7 @@ test("contratos Hablla aceitam somente listas explicitas observadas", () => {
 
   assert.equal(extractCards({ results: cards }), cards);
   assert.equal(extractAttendants({ results: attendants }), attendants);
+  assert.equal(extractPeople({ results: attendants }), attendants);
   assert.deepEqual(extractCards({ results: [] }), []);
 });
 
@@ -19,6 +21,7 @@ test("resposta Hablla 200 malformada nunca vira lista vazia", () => {
   for (const payload of [undefined, null, {}, { results: null }, { results: {} }]) {
     assert.throws(() => extractCards(payload), /Hablla retornou/);
     assert.throws(() => extractAttendants(payload), /Hablla retornou/);
+    assert.throws(() => extractPeople(payload), /Hablla retornou/);
   }
 
   assert.throws(

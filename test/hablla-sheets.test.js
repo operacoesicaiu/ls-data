@@ -10,6 +10,7 @@ const {
   completedDayRanges,
   discoverCardHeaders,
   enrichCardPhones,
+  fetchPeopleForRange,
   selectedDatasets,
   shouldReplaceCardRow,
   CARD_HEADERS,
@@ -158,43 +159,52 @@ test('linhas escrevem os dois telefones e preservam o cabecalho existente', () =
   assert.equal(rows[0].length, header.length);
 });
 
-test('enriquece telefone do card pelo cadastro associado em persons e deduplica consultas', async () => {
+test('mapeia telefone da lista paginada de pessoas para o card sem chamadas individuais', async () => {
   const cards = [
     { id: 'card-1', persons: '["person-1"]', custom_fields: [] },
     { id: 'card-2', persons: ['person-1'], custom_fields: [] },
     { id: 'card-3', persons: [{ id: 'person-2' }], phone: '+5511999998888' },
   ];
-  const calls = [];
-  const summary = await enrichCardPhones({
-    cards,
-    workspaceId: 'workspace',
-    hablla: {
-      get: async (path) => {
-        calls.push(path);
-        return { data: { phones: [{ phone: '+55 31 98888-7777' }] } };
-      },
-    },
-  });
+  const people = [
+    { id: 'person-1', phones: [{ phone: '+55 31 98888-7777', is_whatsapp: true }] },
+    { id: 'person-2', phones: [{ phone: '+55 11 99999-8888' }] },
+  ];
+  const summary = enrichCardPhones(cards, people);
 
-  assert.deepEqual(calls.sort(), [
-    '/v1/workspaces/workspace/persons/person-1',
-  ]);
   assert.equal(cards[0].phone, '+55 31 98888-7777');
   assert.equal(cards[1].phone, '+55 31 98888-7777');
   assert.equal(cards[2].phone, '+5511999998888');
   const { header, rows } = buildCardSheet(cards, CARD_HEADERS);
   assert.equal(rows[0][header.indexOf('Telefone')], '+55 31 98888-7777');
   assert.equal(rows[1][header.indexOf('Telefone')], '+55 31 98888-7777');
-  assert.deepEqual(summary, { personIds: 1, peopleNotFound: 0, cardsWithPhone: 3 });
+  assert.deepEqual(summary, { people: 2, peopleWithPhone: 2, linkedPeopleMissing: 0, cardsWithPhone: 3 });
 });
 
-test('ID de pessoa sem cadastro continua sem telefone e conta como ausente', async () => {
-  const cards = [{ id: 'card-1', persons: ['missing-person'] }];
-  const summary = await enrichCardPhones({
-    cards,
-    workspaceId: 'workspace',
-    hablla: { get: async () => { throw new Error('Hablla API falhou: status=404 code=unknown'); } },
+test('lista pessoas de forma paginada como o fluxo icaiu-data e respeita populate', async () => {
+  const calls = [];
+  const firstPage = Array.from({ length: 50 }, (_, index) => ({ id: `person-${index}`, created_at: '2026-09-01', updated_at: '2026-09-01' }));
+  const lastPage = [{ id: 'person-50', created_at: '2026-10-01', updated_at: '2026-10-02', phones: [{ phone: '+55 31 98888-7777' }] }];
+  const people = await fetchPeopleForRange({
+    get: async (path, options) => {
+      calls.push({ path, params: options.params });
+      return { data: { results: options.params.page === 1 ? firstPage : lastPage } };
+    },
+  }, 'workspace', { start: '2026-08-28', end: '2026-10-26' });
+
+  assert.equal(people.length, 51);
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls[0], {
+    path: '/v1/workspaces/workspace/persons',
+    params: {
+      start_date: '2026-08-28', end_date: '2026-10-26', page: 1,
+      limit: 50, field_date: 'created_at', populate: true,
+    },
   });
+});
+
+test('contabiliza card cujo ID nao veio na janela de pessoas e nao inventa telefone', () => {
+  const cards = [{ id: 'card-1', persons: ['older-person'] }];
+  const summary = enrichCardPhones(cards, []);
   assert.equal(cards[0].phone, undefined);
-  assert.deepEqual(summary, { personIds: 1, peopleNotFound: 1, cardsWithPhone: 0 });
+  assert.deepEqual(summary, { people: 0, peopleWithPhone: 0, linkedPeopleMissing: 1, cardsWithPhone: 0 });
 });
