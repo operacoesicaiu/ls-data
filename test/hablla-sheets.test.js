@@ -11,7 +11,8 @@ const {
   discoverCardHeaders,
   enrichCardPhones,
   fetchPeopleForRange,
-  personDateRange,
+  fetchPeopleForCardWindow,
+  personDateRanges,
   selectedDatasets,
   shouldReplaceCardRow,
   CARD_HEADERS,
@@ -203,12 +204,33 @@ test('lista pessoas de forma paginada como o fluxo icaiu-data e respeita populat
   });
 });
 
-test('intervalo de pessoas cobre todos os 60 dias dos cards ate hoje', () => {
-  const range = personDateRange(60, new Date('2026-10-26T15:00:00.000Z'));
-  assert.deepEqual(range, {
-    start: '2026-08-27T03:00:00.000Z',
-    end: '2026-10-26T15:00:00.000Z',
-  });
+test('pessoas sao consultadas em janelas diarias, do corte de 60 dias ate agora', () => {
+  const now = new Date('2026-10-26T15:00:00.000Z');
+  const ranges = personDateRanges(60, now);
+  assert.equal(ranges.length, 61);
+  assert.equal(ranges[0].start, '2026-08-27T03:00:00.000Z');
+  assert.equal(ranges[0].end, '2026-08-28T02:59:59.999Z');
+  assert.equal(ranges.at(-1).start, '2026-10-26T03:00:00.000Z');
+  assert.equal(ranges.at(-1).end, '2026-10-26T15:00:00.000Z');
+});
+
+test('janela de cards busca pessoas por dia e consolida IDs repetidos', async () => {
+  const requestedRanges = [];
+  const people = await fetchPeopleForCardWindow({
+    get: async (_path, { params }) => {
+      requestedRanges.push([params.start_date, params.end_date]);
+      return { data: { results: requestedRanges.length === 1
+        ? [{ id: 'person-1', created_at: '2026-08-27', updated_at: '2026-08-27', phones: [] }]
+        : requestedRanges.length === 2
+          ? [{ id: 'person-1', created_at: '2026-08-27', updated_at: '2026-10-01', phones: [{ phone: '+5531999998888' }] }]
+          : [] } };
+    },
+  }, 'workspace', 2, new Date('2026-10-26T15:00:00.000Z'));
+
+  assert.equal(requestedRanges.length, 3);
+  assert.equal(people.length, 1);
+  assert.equal(people[0].updated_at, '2026-10-01');
+  assert.equal(people[0].phones[0].phone, '+5531999998888');
 });
 
 test('contabiliza card cujo ID nao veio na janela de pessoas e nao inventa telefone', () => {

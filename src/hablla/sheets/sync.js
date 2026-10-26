@@ -127,11 +127,14 @@ function completedDayRanges(days) {
   );
 }
 
-function personDateRange(days, now = new Date()) {
-  return {
-    start: saoPauloDayRange(days, now).start,
-    end: now.toISOString(),
-  };
+function personDateRanges(days, now = new Date()) {
+  return Array.from({ length: days + 1 }, (_, index) => {
+    const dayRange = saoPauloDayRange(days - index, now);
+    return {
+      start: dayRange.start,
+      end: index === days ? now.toISOString() : dayRange.end,
+    };
+  });
 }
 
 function log(message, isError = false) {
@@ -383,6 +386,24 @@ async function fetchPeopleForRange(hablla, workspaceId, range) {
   return [...peopleById.values()];
 }
 
+async function fetchPeopleForCardWindow(hablla, workspaceId, days, now = new Date()) {
+  const ranges = personDateRanges(days, now);
+  const peopleById = new Map();
+  for (const range of ranges) {
+    const people = await fetchPeopleForRange(hablla, workspaceId, range);
+    for (const person of people) {
+      const id = String(person.id);
+      const current = peopleById.get(id);
+      const updatedAt = new Date(person.updated_at || person.created_at).getTime();
+      const currentUpdatedAt = current
+        ? new Date(current.updated_at || current.created_at).getTime()
+        : Number.NEGATIVE_INFINITY;
+      if (!current || updatedAt >= currentUpdatedAt) peopleById.set(id, person);
+    }
+  }
+  return [...peopleById.values()];
+}
+
 function columnLetter(index) {
   let value = index + 1;
   let result = "";
@@ -571,9 +592,8 @@ async function run() {
         passes,
         attempts,
       });
-      const peopleRange = personDateRange(cardDays);
-      log(`Buscando pessoas Hablla criadas entre ${peopleRange.start} e ${peopleRange.end}...`);
-      const people = await fetchPeopleForRange(hablla, HABLLA_WORKSPACE_ID, peopleRange);
+      log(`Buscando pessoas Hablla por dia na janela de ${cardDays} dias...`);
+      const people = await fetchPeopleForCardWindow(hablla, HABLLA_WORKSPACE_ID, cardDays);
       const phoneSummary = enrichCardPhones(cards, people);
       log(`Telefones Hablla: ${phoneSummary.cardsWithPhone}/${cards.length} cards; ${phoneSummary.peopleWithPhone}/${phoneSummary.people} pessoas com telefone; ${phoneSummary.linkedPeopleMissing} cards sem pessoa correspondente na janela.`);
       const existingHeaderRows = await sheets.getValues(
@@ -701,7 +721,8 @@ module.exports._internals = {
   buildCardSheet,
   enrichCardPhones,
   fetchPeopleForRange,
-  personDateRange,
+  fetchPeopleForCardWindow,
+  personDateRanges,
   collectCardSnapshots,
   completedDayRanges,
   discoverCardHeaders,
