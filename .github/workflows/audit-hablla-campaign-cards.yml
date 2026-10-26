@@ -43,5 +43,5 @@ jobs:
           GOOGLE_PRIVATE_KEY: ${{ secrets.GOOGLE_PRIVATE_KEY }}
           HABLLA_MIN_INTERVAL_MS: "150"
           NEXUS_DISPARO_LOG: ${{ secrets.NEXUS_DISPARO_LOG }}
-          NEXUS_REPO_PATH: "D:/Projects/nexus"
+
 

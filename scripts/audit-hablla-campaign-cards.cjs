@@ -4,7 +4,7 @@ const axios = require("axios");
 const { getGoogleAccessToken } = require("../src/google/auth");
 const saoPauloDayRange = require("../src/hablla/date-range");
 const { createRequire } = require("node:module");
-const nexusRequire = createRequire(`${process.env.NEXUS_REPO_PATH || "D:/Projects/nexus"}/package.json`);
+const nexusRequire = createRequire(`${process.cwd()}/package.json`);
 const { buildDisparoBase } = nexusRequire("./functions/_lib/disparo.js");
 
 const CAMPAIGN_LIST = "6a873ec8a02f500d3ab0f07f";
