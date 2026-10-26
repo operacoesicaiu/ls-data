@@ -127,6 +127,13 @@ function completedDayRanges(days) {
   );
 }
 
+function personDateRange(days, now = new Date()) {
+  return {
+    start: saoPauloDayRange(days, now).start,
+    end: saoPauloDayRange(0, now).end,
+  };
+}
+
 function log(message, isError = false) {
   const line = `[${new Date().toISOString()}] [${isError ? "ERROR" : "INFO"}] ${message}`;
   (isError ? console.error : console.log)(line);
@@ -564,8 +571,9 @@ async function run() {
         passes,
         attempts,
       });
-      log(`Buscando pessoas Hablla criadas entre ${cardRange.start} e ${cardRange.end}...`);
-      const people = await fetchPeopleForRange(hablla, HABLLA_WORKSPACE_ID, cardRange);
+      const peopleRange = personDateRange(cardDays);
+      log(`Buscando pessoas Hablla criadas entre ${peopleRange.start} e ${peopleRange.end}...`);
+      const people = await fetchPeopleForRange(hablla, HABLLA_WORKSPACE_ID, peopleRange);
       const phoneSummary = enrichCardPhones(cards, people);
       log(`Telefones Hablla: ${phoneSummary.cardsWithPhone}/${cards.length} cards; ${phoneSummary.peopleWithPhone}/${phoneSummary.people} pessoas com telefone; ${phoneSummary.linkedPeopleMissing} cards sem pessoa correspondente na janela.`);
       const existingHeaderRows = await sheets.getValues(
@@ -693,6 +701,7 @@ module.exports._internals = {
   buildCardSheet,
   enrichCardPhones,
   fetchPeopleForRange,
+  personDateRange,
   collectCardSnapshots,
   completedDayRanges,
   discoverCardHeaders,
