@@ -207,7 +207,7 @@ test('intervalo de pessoas cobre todos os 60 dias dos cards ate hoje', () => {
   const range = personDateRange(60, new Date('2026-10-26T15:00:00.000Z'));
   assert.deepEqual(range, {
     start: '2026-08-27T03:00:00.000Z',
-    end: '2026-10-27T02:59:59.999Z',
+    end: '2026-10-26T15:00:00.000Z',
   });
 });
 

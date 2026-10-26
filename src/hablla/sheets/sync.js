@@ -130,7 +130,7 @@ function completedDayRanges(days) {
 function personDateRange(days, now = new Date()) {
   return {
     start: saoPauloDayRange(days, now).start,
-    end: saoPauloDayRange(0, now).end,
+    end: now.toISOString(),
   };
 }
 
