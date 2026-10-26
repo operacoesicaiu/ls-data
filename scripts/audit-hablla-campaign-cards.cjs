@@ -56,7 +56,7 @@ async function main() {
   const sheetId = process.env.HABLLA_SPREADSHEET_ID;
   if (!sheetId) throw new Error("HABLLA_SPREADSHEET_ID ausente");
   const googleToken = await getGoogleAccessToken();
-  const ranges = ["'Base Hablla Card'!B2:B", "'Base Hablla Card'!E2:E", "'Base Hablla Card'!H2:H", "'Base Hablla Card'!I2:I", "'Base Hablla Card'!N2:N", "'Base Hablla Card'!O2:O", "'Base Hablla Card'!S2:S", "'Base Hablla Card'!T2:T"];
+  const ranges = ["'Base Hablla Card'!B2:B", "'Base Hablla Card'!C2:C", "'Base Hablla Card'!E2:E", "'Base Hablla Card'!H2:H", "'Base Hablla Card'!I2:I", "'Base Hablla Card'!N2:N", "'Base Hablla Card'!O2:O", "'Base Hablla Card'!S2:S", "'Base Hablla Card'!T2:T"];
   const query = new URLSearchParams({ majorDimension: "ROWS", valueRenderOption: "UNFORMATTED_VALUE", dateTimeRenderOption: "SERIAL_NUMBER" });
   for (const range of ranges) query.append("ranges", range);
   const sheetResponse = await axios.get(
@@ -77,12 +77,12 @@ async function main() {
     const cardId = String(sheetColumn("O", index) || "").trim();
     if (!cardId) continue;
     sheetIdCounts.set(cardId, (sheetIdCounts.get(cardId) || 0) + 1);
-    const createdDay = sheetSerialDay(sheetColumn("C", index));
+    const createdDay = sheetSerialDay(sheetColumn("B", index));
     if (createdDay != null) sheetDateParsed += 1;
     sheetCards.push({
       id: cardId,
       createdDay,
-      updatedDay: sheetSerialDay(sheetColumn("B", index)),
+      updatedDay: sheetSerialDay(sheetColumn("C", index)),
       list: String(sheetColumn("E", index) || "").trim(),
       customPhone: String(sheetColumn("T", index) || ""),
       name: String(sheetColumn("I", index) || ""),
