@@ -26,7 +26,10 @@ function sheetSerialDay(value) {
   const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   const parts = br
     ? [Number(br[3]), Number(br[2]), Number(br[1])]
-    : iso ? [Number(iso[1]), Number(iso[2]), Number(iso[3])] : null;
+    : iso ? [Number(iso[1]), Number(iso[2]), Number(iso[3])]
+    : /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}$/.test(text)
+      ? [Number(text.slice(6, 10)), Number(text.slice(3, 5)), Number(text.slice(0, 2))]
+      : null;
   if (!parts) return null;
   const date = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
   if (date.getUTCFullYear() !== parts[0] || date.getUTCMonth() !== parts[1] - 1 || date.getUTCDate() !== parts[2]) return null;
