@@ -38,4 +38,7 @@ jobs:
           HABLLA_PASSWORD: ${{ secrets.HABLLA_PASSWORD }}
           HABLLA_WORKSPACE_ID: ${{ secrets.HABLLA_WORKSPACE_ID }}
           HABLLA_BOARD_ID: ${{ secrets.HABLLA_BOARD_ID }}
+          HABLLA_SPREADSHEET_ID: ${{ secrets.HABLLA_SPREADSHEET_ID }}
+          GOOGLE_CLIENT_EMAIL: ${{ secrets.GOOGLE_CLIENT_EMAIL }}
+          GOOGLE_PRIVATE_KEY: ${{ secrets.GOOGLE_PRIVATE_KEY }}
           HABLLA_MIN_INTERVAL_MS: "150"

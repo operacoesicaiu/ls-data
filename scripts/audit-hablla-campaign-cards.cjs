@@ -1,5 +1,7 @@
 const getHabllaClient = require("../src/hablla/api");
 const collectHabllaCards = require("../src/hablla/card-collector");
+const axios = require("axios");
+const { getGoogleAccessToken } = require("../src/google/auth");
 
 const CAMPAIGN_LIST = "6a873ec8a02f500d3ab0f07f";
 const SAPO_DISPARO_LIST = "684b0513919fd2dca2e5f343";
@@ -14,6 +16,20 @@ function tagIds(card) {
   return (Array.isArray(card.tags) ? card.tags : []).map((tag) =>
     typeof tag === "string" ? tag : String(tag?.id || tag?._id || ""),
   );
+}
+
+function sheetSerialDay(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return Math.floor(value);
+  const text = String(value || "").trim();
+  const br = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  const parts = br
+    ? [Number(br[3]), Number(br[2]), Number(br[1])]
+    : iso ? [Number(iso[1]), Number(iso[2]), Number(iso[3])] : null;
+  if (!parts) return null;
+  const date = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+  if (date.getUTCFullYear() !== parts[0] || date.getUTCMonth() !== parts[1] - 1 || date.getUTCDate() !== parts[2]) return null;
+  return Math.floor(date.getTime() / 86_400_000) + 25569;
 }
 
 async function main() {
@@ -31,6 +47,34 @@ async function main() {
     cutoff: cutoff.toISOString(),
     exhaustive: true,
   });
+
+  const sheetId = process.env.HABLLA_SPREADSHEET_ID;
+  if (!sheetId) throw new Error("HABLLA_SPREADSHEET_ID ausente");
+  const googleToken = await getGoogleAccessToken();
+  const ranges = ["'Base Hablla Card'!B2:B", "'Base Hablla Card'!E2:E", "'Base Hablla Card'!N2:N", "'Base Hablla Card'!O2:O"];
+  const sheetResponse = await axios.get(
+    `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sheetId)}/values:batchGet`,
+    {
+      params: { ranges, majorDimension: "ROWS", valueRenderOption: "UNFORMATTED_VALUE", dateTimeRenderOption: "SERIAL_NUMBER" },
+      headers: { Authorization: `Bearer ${googleToken}` },
+      timeout: 60000,
+    },
+  );
+  const sheetColumns = ranges.map((_, index) => (sheetResponse.data?.valueRanges?.[index]?.values || []).map((row) => row?.[0] ?? ""));
+  const sheetRowCount = Math.max(0, ...sheetColumns.map((column) => column.length));
+  const sheetCards = [];
+  const sheetIdCounts = new Map();
+  for (let index = 0; index < sheetRowCount; index += 1) {
+    const cardId = String(sheetColumns[3][index] || "").trim();
+    if (!cardId) continue;
+    sheetIdCounts.set(cardId, (sheetIdCounts.get(cardId) || 0) + 1);
+    sheetCards.push({
+      id: cardId,
+      createdDay: sheetSerialDay(sheetColumns[0][index]),
+      list: String(sheetColumns[1][index] || "").trim(),
+      finishedAt: sheetColumns[2][index],
+    });
+  }
 
   const byList = new Map();
   let campaignName = 0;
@@ -65,6 +109,16 @@ async function main() {
     .slice(0, 12)
     .map(([id, count]) => ({ id, count }));
 
+  const cutoffDay = Math.floor(cutoff.getTime() / 86_400_000) + 25569;
+  const apiCardsById = new Map(cards.map((card) => [String(card.id), card]));
+  const sheetCardsInWindow = sheetCards.filter((card) => card.createdDay != null && card.createdDay >= cutoffDay);
+  const sheetCardsInWindowById = new Map(sheetCardsInWindow.map((card) => [card.id, card]));
+  const matchedIds = [...apiCardsById.keys()].filter((id) => sheetCardsInWindowById.has(id));
+  const duplicatedSheetRows = [...sheetIdCounts.values()].reduce((total, count) => total + Math.max(0, count - 1), 0);
+  const sheetCampaignList = sheetCardsInWindow.filter((card) => card.list === CAMPAIGN_LIST).length;
+  const sheetSapoList = sheetCardsInWindow.filter((card) => card.list === SAPO_DISPARO_LIST).length;
+  const sheetFinishedInWindow = sheetCardsInWindow.filter((card) => card.finishedAt !== "").length;
+
   console.log(JSON.stringify({
     audit: "read-only Hablla card count; no sheet writes",
     createdAtFrom: cutoff.toISOString(),
@@ -72,6 +126,17 @@ async function main() {
     workspaceId: process.env.HABLLA_WORKSPACE_ID,
     boardId: process.env.HABLLA_BOARD_ID,
     totalCardsCreatedSinceStart: cards.length,
+    apiSheetComparison: {
+      sheetCardRowsWithId: sheetCards.length,
+      sheetCardsCreatedSinceStart: sheetCardsInWindow.length,
+      apiCardsMissingFromSheetSinceStart: Math.max(0, cards.length - matchedIds.length),
+      sheetCardsNotReturnedByApiSinceStart: Math.max(0, sheetCardsInWindow.length - matchedIds.length),
+      idsMatchedBetweenApiAndSheet: matchedIds.length,
+      duplicatedSheetRowsForSameCardId: duplicatedSheetRows,
+      sheetCardsWithFinishedAtSinceStart: sheetFinishedInWindow,
+      sheetCardsInCampaignListSinceStart: sheetCampaignList,
+      sheetCardsInSapoDisparoListSinceStart: sheetSapoList,
+    },
     withPhoneOnCardOrPhoneCustomField: withPhone,
     finishedAtFilled: finished,
     campaignNameMatched: campaignName,
