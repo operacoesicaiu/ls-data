@@ -60,7 +60,7 @@ async function main() {
     workspaceId: process.env.HABLLA_WORKSPACE_ID,
     boardId: process.env.HABLLA_BOARD_ID,
     cutoff: cutoff.toISOString(),
-    exhaustive: false,
+    exhaustive: true,
     pagesWithoutRecentCreated: 2,
   });
 
