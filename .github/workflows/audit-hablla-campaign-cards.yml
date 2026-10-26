@@ -1,0 +1,47 @@
+name: Temporary exact Nexus Sapo audit
+
+on:
+  workflow_dispatch:
+    inputs:
+      from_date:
+        description: "Creation date lower bound (YYYY-MM-DD)"
+        required: true
+        default: "2026-09-28"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: read-only-hablla-card-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Compare Hablla cards, Sheets, and Nexus filters
+        run: node scripts/audit-hablla-campaign-cards.cjs
+        env:
+          AUDIT_FROM_DATE: ${{ inputs.from_date }}
+          HABLLA_TOKEN: ${{ secrets.HABLLA_TOKEN }}
+          HABLLA_EMAIL: ${{ secrets.HABLLA_EMAIL }}
+          HABLLA_PASSWORD: ${{ secrets.HABLLA_PASSWORD }}
+          HABLLA_WORKSPACE_ID: ${{ secrets.HABLLA_WORKSPACE_ID }}
+          HABLLA_BOARD_ID: ${{ secrets.HABLLA_BOARD_ID }}
+          HABLLA_SPREADSHEET_ID: ${{ secrets.HABLLA_SPREADSHEET_ID }}
+          GOOGLE_CLIENT_EMAIL: ${{ secrets.GOOGLE_CLIENT_EMAIL }}
+          GOOGLE_PRIVATE_KEY: ${{ secrets.GOOGLE_PRIVATE_KEY }}
+          HABLLA_MIN_INTERVAL_MS: "150"
+          NEXUS_DISPARO_LOG: ${{ secrets.NEXUS_DISPARO_LOG }}
+          NEXUS_REPO_PATH: "D:/Projects/nexus"
+
