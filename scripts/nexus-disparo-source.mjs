@@ -1,6 +1,3 @@
-import { listCredentials, requireCredentialStorage } from './credentials.js';
-import { decryptVaultEntryFields } from './vault-entries.js';
-
 export const DISPARO_LOG_PREFIX = 'disparo:logs:v1:';
 const DISPARO_SETTINGS_PREFIX = 'disparo:settings:v1:';
 
