@@ -5,7 +5,7 @@ const { getGoogleAccessToken } = require("../src/google/auth");
 
 const CAMPAIGN_LIST = "6a873ec8a02f500d3ab0f07f";
 const SAPO_DISPARO_LIST = "684b0513919fd2dca2e5f343";
-const CAMPAIGN_TAG = "683736f993808f81627b3f01";
+const CAMPAIGN_TAGS = new Set(["683734fe6bf0b4e6f3565fe1", "683736f993808f81627b3f01"]);
 
 function listId(value) {
   if (typeof value === "string" || typeof value === "number") return String(value);
@@ -51,7 +51,7 @@ async function main() {
   const sheetId = process.env.HABLLA_SPREADSHEET_ID;
   if (!sheetId) throw new Error("HABLLA_SPREADSHEET_ID ausente");
   const googleToken = await getGoogleAccessToken();
-  const ranges = ["'Base Hablla Card'!B2:B", "'Base Hablla Card'!E2:E", "'Base Hablla Card'!N2:N", "'Base Hablla Card'!O2:O"];
+  const ranges = ["'Base Hablla Card'!B2:B", "'Base Hablla Card'!E2:E", "'Base Hablla Card'!H2:H", "'Base Hablla Card'!I2:I", "'Base Hablla Card'!N2:N", "'Base Hablla Card'!O2:O", "'Base Hablla Card'!S2:S", "'Base Hablla Card'!T2:T"];
   const query = new URLSearchParams({ majorDimension: "ROWS", valueRenderOption: "UNFORMATTED_VALUE", dateTimeRenderOption: "SERIAL_NUMBER" });
   for (const range of ranges) query.append("ranges", range);
   const sheetResponse = await axios.get(
@@ -73,7 +73,10 @@ async function main() {
       id: cardId,
       createdDay: sheetSerialDay(sheetColumns[0][index]),
       list: String(sheetColumns[1][index] || "").trim(),
-      finishedAt: sheetColumns[2][index],
+      customPhone: String(sheetColumns[2][index] || ""),
+      name: String(sheetColumns[3][index] || ""),
+      finishedAt: sheetColumns[4][index],
+      phone: String(sheetColumns[6][index] || sheetColumns[7][index] || ""),
     });
   }
 
@@ -83,6 +86,12 @@ async function main() {
   let campaignList = 0;
   let sapoDisparoList = 0;
   let campaignTag = 0;
+  let campaignTagFirst = 0;
+  let campaignTagSecond = 0;
+  let sapoCampaignName = 0;
+  let sapoCampaignFinished = 0;
+  let sapoCampaignWindow = 0;
+  let sapoCampaignWithPhone = 0;
   let finished = 0;
   let withPhone = 0;
   const phoneFieldId = "69e8d49592607a5877e699d5";
@@ -95,7 +104,10 @@ async function main() {
     if (/ativo de desconto/i.test(name)) discountCardName += 1;
     if (currentList === CAMPAIGN_LIST) campaignList += 1;
     if (currentList === SAPO_DISPARO_LIST) sapoDisparoList += 1;
-    if (tagIds(card).includes(CAMPAIGN_TAG)) campaignTag += 1;
+    const currentTags = tagIds(card);
+    if ([...CAMPAIGN_TAGS].some((id) => currentTags.includes(id))) campaignTag += 1;
+    if (currentTags.includes("683734fe6bf0b4e6f3565fe1")) campaignTagFirst += 1;
+    if (currentTags.includes("683736f993808f81627b3f01")) campaignTagSecond += 1;
     if (card.finished_at) finished += 1;
     const customPhone = (card.custom_fields || []).some((field) =>
       String(field?.custom_field?.id || field?.custom_field || "") === phoneFieldId
@@ -103,6 +115,12 @@ async function main() {
     );
     const cardPhone = /\d{10,}/.test(String(card.phone || ""));
     if (customPhone || cardPhone) withPhone += 1;
+    if (currentList === SAPO_DISPARO_LIST && /ativo de desconto/i.test(name)) {
+      sapoCampaignName += 1;
+      if (card.finished_at) sapoCampaignFinished += 1;
+      if (Date.parse(card.created_at) >= cutoff.getTime()) sapoCampaignWindow += 1;
+      if (customPhone || cardPhone) sapoCampaignWithPhone += 1;
+    }
   }
 
   const largestLists = [...byList.entries()]
@@ -119,6 +137,22 @@ async function main() {
   const sheetCampaignList = sheetCardsInWindow.filter((card) => card.list === CAMPAIGN_LIST).length;
   const sheetSapoList = sheetCardsInWindow.filter((card) => card.list === SAPO_DISPARO_LIST).length;
   const sheetFinishedInWindow = sheetCardsInWindow.filter((card) => card.finishedAt !== "").length;
+  const sheetSapoCampaign = sheetCardsInWindow.filter((card) => card.list === SAPO_DISPARO_LIST && /ativo de desconto/i.test(card.name));
+  const sheetSapoCampaignPhone = sheetSapoCampaign.filter((card) => /\d{10,}/.test(`${card.phone} ${card.customPhone}`)).length;
+  const sheetOnlyIds = sheetCardsInWindow.filter((card) => !apiCardsById.has(card.id));
+  let sheetOnlyReturnedByDirectGet = 0;
+  let sheetOnlyNotFoundByDirectGet = 0;
+  let sheetOnlyDirectGetOther = 0;
+  for (const card of sheetOnlyIds) {
+    try {
+      await hablla.get(`/v1/workspaces/${process.env.HABLLA_WORKSPACE_ID}/cards/${encodeURIComponent(card.id)}`);
+      sheetOnlyReturnedByDirectGet += 1;
+    } catch (error) {
+      const status = error?.response?.status;
+      if (status === 404) sheetOnlyNotFoundByDirectGet += 1;
+      else sheetOnlyDirectGetOther += 1;
+    }
+  }
 
   console.log(JSON.stringify({
     audit: "read-only Hablla card count; no sheet writes",
@@ -137,17 +171,32 @@ async function main() {
       sheetCardsWithFinishedAtSinceStart: sheetFinishedInWindow,
       sheetCardsInCampaignListSinceStart: sheetCampaignList,
       sheetCardsInSapoDisparoListSinceStart: sheetSapoList,
+      sheetSapoDisparoNamedAtivoDescontoSinceStart: sheetSapoCampaign.length,
+      sheetSapoDisparoNamedAtivoDescontoWithPhone: sheetSapoCampaignPhone,
+      sheetSapoDisparoNamedAtivoDescontoFinished: sheetSapoCampaign.filter((card) => card.finishedAt !== "").length,
+      sheetOnlyCardsReturnedByDirectGet: sheetOnlyReturnedByDirectGet,
+      sheetOnlyCardsNotFoundByDirectGet: sheetOnlyNotFoundByDirectGet,
+      sheetOnlyCardsWithOtherDirectGetStatus: sheetOnlyDirectGetOther,
+      sheetOnlyCardsCountedForDirectGet: sheetOnlyIds.length,
     },
     withPhoneOnCardOrPhoneCustomField: withPhone,
     finishedAtFilled: finished,
     campaignNameMatched: campaignName,
     discountCardNameMatched: discountCardName,
+    sapoListNamedAtivoDesconto: {
+      apiCount: sapoCampaignName,
+      apiFinishedAtFilled: sapoCampaignFinished,
+      apiCreatedSinceCutoff: sapoCampaignWindow,
+      apiWithPhone: sapoCampaignWithPhone,
+    },
     campaignListId: CAMPAIGN_LIST,
     cardsInCampaignList: campaignList,
     sapoDisparoListId: SAPO_DISPARO_LIST,
     cardsInSapoDisparoList: sapoDisparoList,
-    campaignTagId: CAMPAIGN_TAG,
+    campaignTagIds: [...CAMPAIGN_TAGS],
     cardsWithCampaignTag: campaignTag,
+    cardsWithFirstCampaignTag: campaignTagFirst,
+    cardsWithSecondCampaignTag: campaignTagSecond,
     topLists: largestLists,
   }, null, 2));
 }
