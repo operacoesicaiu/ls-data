@@ -16,6 +16,7 @@ async function getBuildDisparoBase() {
 
 const CAMPAIGN_LIST = "6a873ec8a02f500d3ab0f07f";
 const SAPO_DISPARO_LIST = "684b0513919fd2dca2e5f343";
+const PHONE_FIELD = "69e8d49592607a5877e699d5";
 const CAMPAIGN_TAGS = new Set(["683734fe6bf0b4e6f3565fe1", "683736f993808f81627b3f01"]);
 
 function listId(value) {
