@@ -8,7 +8,7 @@ let buildDisparoBasePromise;
 
 async function getBuildDisparoBase() {
   if (!buildDisparoBasePromise) {
-    const modulePath = process.env.NEXUS_DISPARO_MODULE || `${process.cwd()}/nexus/functions/_lib/disparo.js`;
+    const modulePath = process.env.NEXUS_DISPARO_MODULE || `${process.cwd()}/scripts/nexus-disparo-source.mjs`;
     buildDisparoBasePromise = import(pathToFileURL(modulePath).href).then((module) => module.buildDisparoBase);
   }
   return buildDisparoBasePromise;
@@ -271,4 +271,5 @@ main().catch((error) => {
   console.error(`Hablla audit failed: ${error.message}`);
   process.exitCode = 1;
 });
+
 
