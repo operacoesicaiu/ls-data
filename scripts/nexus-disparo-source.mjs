@@ -19,12 +19,12 @@ export const DISPARO_COMPANIES = Object.freeze({
 
 export const DISPARO_OPTIONS = Object.freeze({
   dispositivos: ['TODOS', 'iPhone', 'Apple Watch', 'iPad', 'iMac', 'Macbook', 'Outros', 'N/D'],
-  servicos: ['TODOS', 'Aparelho Inoperante', 'Aparelho inoperante', 'Bateria', 'Face ID', 'Outro problema', 'reparo em placa', 'Sistema / Lentidão', 'Tela Quebrada', 'Tela quebrada', 'Vidro Quebrado', 'Vidro Traseiro'],
-  motivosContato: ['TODOS', 'Consertar aparelho', 'Sobre outro assunto', 'Exercer garantia', 'Proteger aparelho', 'Comprar aparelho', 'Vender aparelho', 'Serviço em andamento', 'Alteração no agendamento', 'Serviço que não realizamos'],
-  estagios: ['TODOS', 'Aguardando Resposta - Gatilho', 'Qualificação'],
+  servicos: ['TODOS', 'Aparelho Inoperante', 'Aparelho inoperante', 'Bateria', 'Face ID', 'Outro problema', 'reparo em placa', 'Sistema / Lentidï¿½o', 'Tela Quebrada', 'Tela quebrada', 'Vidro Quebrado', 'Vidro Traseiro'],
+  motivosContato: ['TODOS', 'Consertar aparelho', 'Sobre outro assunto', 'Exercer garantia', 'Proteger aparelho', 'Comprar aparelho', 'Vender aparelho', 'Serviï¿½o em andamento', 'Alteraï¿½ï¿½o no agendamento', 'Serviï¿½o que nï¿½o realizamos'],
+  estagios: ['TODOS', 'Aguardando Resposta - Gatilho', 'Qualificaï¿½ï¿½o'],
   setores: ['TODOS', 'Comercial'],
-  removerAgendamento: ['TODOS', 'Sim', 'Não', 'N/D'],
-  motivosNaoAgendamento: ['TODOS', 'Seviço Apple não realizado', 'Não precisou mais do serviço', 'Falta de disponibilidade do cliente', 'Autorizada Apple', 'Preço - Pesquisando', 'Prazo de entrega', 'Outras marcas', 'Localização', 'Preço - Achou caro', 'Preço - Queria original', 'Tratado em outra conversa', 'Foi em loja sem agendar', 'Preço - Falta de estoque', 'Falta de vaga na agenda', 'Preço - Sem dinheiro', 'Agendamento para mais de 10 dias', 'N/D'],
+  removerAgendamento: ['TODOS', 'Sim', 'Nï¿½o', 'N/D'],
+  motivosNaoAgendamento: ['TODOS', 'Seviï¿½o Apple nï¿½o realizado', 'Nï¿½o precisou mais do serviï¿½o', 'Falta de disponibilidade do cliente', 'Autorizada Apple', 'Preï¿½o - Pesquisando', 'Prazo de entrega', 'Outras marcas', 'Localizaï¿½ï¿½o', 'Preï¿½o - Achou caro', 'Preï¿½o - Queria original', 'Tratado em outra conversa', 'Foi em loja sem agendar', 'Preï¿½o - Falta de estoque', 'Falta de vaga na agenda', 'Preï¿½o - Sem dinheiro', 'Agendamento para mais de 10 dias', 'N/D'],
 });
 
 export const DISPARO_DEFAULTS = Object.freeze({
@@ -34,7 +34,7 @@ export const DISPARO_DEFAULTS = Object.freeze({
   estagios: ['TODOS'],
   setores: ['TODOS'],
   removerAgendamento: ['Sim'],
-  motivosNaoAgendamento: ['Preço - Queria original', 'Preço - Sem dinheiro', 'Preço - Falta de estoque', 'Preço - Achou caro', 'Falta de disponibilidade do cliente', 'Preço - Pesquisando', 'Falta de vaga na agenda', 'Prazo de entrega', 'N/D'],
+  motivosNaoAgendamento: ['Preï¿½o - Queria original', 'Preï¿½o - Sem dinheiro', 'Preï¿½o - Falta de estoque', 'Preï¿½o - Achou caro', 'Falta de disponibilidade do cliente', 'Preï¿½o - Pesquisando', 'Falta de vaga na agenda', 'Prazo de entrega', 'N/D'],
 });
 
 export const DISPARO_COMPANY_DEFAULTS = Object.freeze({
@@ -79,11 +79,11 @@ const NAME_TO_ID = new Map([
 ]);
 const ID_TO_NAME = new Map([
   ['67b88bc50e0b77b1c7b23837', 'Aguardando Resposta - Gatilho'],
-  ['679277fd88aa636b724c4b6a', 'Qualificação'],
+  ['679277fd88aa636b724c4b6a', 'Qualificaï¿½ï¿½o'],
   ['679106653b58e512b9dc8678', 'Comercial'],
 ]);
 
-const OUTPUT_HEADERS = ['Nome', 'Telefone', 'Data', 'Dispositivos', 'Serviços', 'Motivos de Contato', 'Estágios', 'Setores', 'Remover com Agendamento'];
+const OUTPUT_HEADERS = ['Nome', 'Telefone', 'Data', 'Dispositivos', 'Serviï¿½os', 'Motivos de Contato', 'Estï¿½gios', 'Setores', 'Remover com Agendamento'];
 const GOOGLE_SCOPE = 'https://www.googleapis.com/auth/spreadsheets.readonly';
 const tokenCache = new Map();
 const FALLBACK_SERVICE_ACCOUNT_EMAILS = new Set([
@@ -158,7 +158,7 @@ function selectedIds(values, label) {
   const ids = new Set();
   for (const name of selected.values) {
     const id = NAME_TO_ID.get(name);
-    if (!id) throw new Error(`Não encontrei o ID para ${label}: ${name}.`);
+    if (!id) throw new Error(`Nï¿½o encontrei o ID para ${label}: ${name}.`);
     ids.add(normalizeDisparoValue(id));
   }
   return { ...selected, values: ids };
@@ -167,13 +167,13 @@ function selectedIds(values, label) {
 export function buildDisparoBase({ sourceRows, erpRows, billingRows, startDate, endDate, filters, companyId = '' }) {
   const start = dateDay(startDate);
   const end = dateDay(endDate);
-  if (start == null || end == null) throw new Error('Informe datas de início e fim válidas.');
-  if (start > end) throw new Error('A data inicial não pode ser posterior à data final.');
+  if (start == null || end == null) throw new Error('Informe datas de inï¿½cio e fim vï¿½lidas.');
+  if (start > end) throw new Error('A data inicial nï¿½o pode ser posterior ï¿½ data final.');
   const chosen = {
     dispositivo: filter(filters.dispositivos),
     servico: filter(filters.servicos),
     motivoContato: filter(filters.motivosContato),
-    estagioId: selectedIds(filters.estagios, 'estágio'),
+    estagioId: selectedIds(filters.estagios, 'estï¿½gio'),
     setorId: selectedIds(filters.setores, 'setor'),
     agendamento: filter(filters.removerAgendamento),
     listaAw: filter(filters.motivosNaoAgendamento),
@@ -237,8 +237,8 @@ function base64Url(bytesOrText) {
 
 function pemBytes(pem) {
   const encoded = text(pem).replace(/\\n/g, '\n').replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g, '');
-  if (!encoded) throw new Error('A chave privada da conta de serviço está vazia.');
-  try { return Uint8Array.from(atob(encoded), character => character.charCodeAt(0)); } catch (_) { throw new Error('A chave privada da conta de serviço é inválida.'); }
+  if (!encoded) throw new Error('A chave privada da conta de serviï¿½o estï¿½ vazia.');
+  try { return Uint8Array.from(atob(encoded), character => character.charCodeAt(0)); } catch (_) { throw new Error('A chave privada da conta de serviï¿½o ï¿½ invï¿½lida.'); }
 }
 
 export function serviceAccountFromFields(fields) {
@@ -256,7 +256,7 @@ export function serviceAccountFromFields(fields) {
   }
   const byLabel = new Map((fields || []).map(field => [normalizeDisparoValue(field.label), text(field.value)]));
   const find = (...names) => names.map(normalizeDisparoValue).map(name => byLabel.get(name)).find(Boolean) || '';
-  const clientEmail = find('client_email', 'client email', 'google_client_email', 'google client email', 'e-mail da conta de serviço', 'email da conta de servico');
+  const clientEmail = find('client_email', 'client email', 'google_client_email', 'google client email', 'e-mail da conta de serviï¿½o', 'email da conta de servico');
   const privateKey = validPrivateKey(find('private_key', 'private key', 'google_private_key', 'google private key', 'chave privada'));
   return clientEmail && privateKey ? { clientEmail, privateKey, tokenUri: 'https://oauth2.googleapis.com/token' } : null;
 }
@@ -292,7 +292,7 @@ export async function findCompanyServiceAccounts(env, companyId) {
   }
   if (candidates.length) return candidates;
   if (!records.length) throw new Error('Cadastre uma credencial Google para esta empresa em Senhas e chaves.');
-  throw new Error('A credencial Google desta empresa não contém client_email e private_key de uma conta de serviço. Uma API key simples não permite ler as planilhas fonte.');
+  throw new Error('A credencial Google desta empresa nï¿½o contï¿½m client_email e private_key de uma conta de serviï¿½o. Uma API key simples nï¿½o permite ler as planilhas fonte.');
 }
 
 export async function findCompanyServiceAccount(env, companyId) {
@@ -310,7 +310,7 @@ export async function googleAccessToken(account, fetchImpl = fetch) {
   const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(signingInput));
   const response = await fetchImpl(account.tokenUri, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: `${signingInput}.${base64Url(signature)}` }) });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok || !payload.access_token) throw new Error(`O Google recusou a conta de serviço: ${payload.error_description || payload.error || `HTTP ${response.status}`}`);
+  if (!response.ok || !payload.access_token) throw new Error(`O Google recusou a conta de serviï¿½o: ${payload.error_description || payload.error || `HTTP ${response.status}`}`);
   tokenCache.set(account.clientEmail, { token: payload.access_token, expiresAt: Date.now() + Math.max(60, Number(payload.expires_in) || 3600) * 1000 });
   return payload.access_token;
 }
@@ -328,7 +328,7 @@ async function sheetTitle(spreadsheetId, sheetId, token, fetchImpl) {
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}?fields=sheets.properties(sheetId,title)`;
   const payload = await googleJson(url, token, {}, fetchImpl);
   const match = (payload.sheets || []).find(sheet => Number(sheet?.properties?.sheetId) === Number(sheetId));
-  if (!match) throw new Error(`A aba gid=${sheetId} não foi encontrada.`);
+  if (!match) throw new Error(`A aba gid=${sheetId} nï¿½o foi encontrada.`);
   return match.properties.title;
 }
 
@@ -404,15 +404,15 @@ export async function readDisparoSources(company, token, fetchImpl = fetch) {
 
 export function validateDisparoRequest(body) {
   const company = DISPARO_COMPANIES[text(body?.companyId)];
-  if (!company) return { error: 'Empresa inválida.' };
+  if (!company) return { error: 'Empresa invï¿½lida.' };
   const start = dateDay(body?.startDate); const end = dateDay(body?.endDate);
-  if (start == null || end == null) return { error: 'Informe datas de início e fim válidas.' };
-  if (start > end) return { error: 'A data inicial não pode ser posterior à data final.' };
+  if (start == null || end == null) return { error: 'Informe datas de inï¿½cio e fim vï¿½lidas.' };
+  if (start > end) return { error: 'A data inicial nï¿½o pode ser posterior ï¿½ data final.' };
   const filters = {};
   for (const [key, allowed] of Object.entries(DISPARO_OPTIONS)) {
     const companyDefaults = disparoDefaultsForCompany(company.id);
     const values = Array.isArray(body?.filters?.[key]) ? body.filters[key].map(text).filter(Boolean) : [...companyDefaults[key]];
-    if (!values.length || values.length > allowed.length || values.some(value => !allowed.includes(value))) return { error: `Filtro ${key} inválido.` };
+    if (!values.length || values.length > allowed.length || values.some(value => !allowed.includes(value))) return { error: `Filtro ${key} invï¿½lido.` };
     filters[key] = values.includes('TODOS') ? ['TODOS'] : [...new Set(values)];
   }
   return { company, startDate: text(body.startDate), endDate: text(body.endDate), filters };
