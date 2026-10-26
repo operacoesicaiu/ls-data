@@ -69,13 +69,17 @@ async function main() {
   const sheetIdCounts = new Map();
   const sheetColumnsByName = new Map(ranges.map((range, index) => [range.match(/!([A-Z]+)2:/)[1], index]));
   const sheetColumn = (letter, index) => sheetColumns[sheetColumnsByName.get(letter)]?.[index] ?? "";
+  let sheetDateParsed = 0;
   for (let index = 0; index < sheetRowCount; index += 1) {
     const cardId = String(sheetColumn("O", index) || "").trim();
     if (!cardId) continue;
     sheetIdCounts.set(cardId, (sheetIdCounts.get(cardId) || 0) + 1);
+    const createdDay = sheetSerialDay(sheetColumn("C", index));
+    if (createdDay != null) sheetDateParsed += 1;
     sheetCards.push({
       id: cardId,
-      createdDay: sheetSerialDay(sheetColumn("C", index)),
+      createdDay,
+      updatedDay: sheetSerialDay(sheetColumn("B", index)),
       list: String(sheetColumn("E", index) || "").trim(),
       customPhone: String(sheetColumn("T", index) || ""),
       name: String(sheetColumn("I", index) || ""),
@@ -155,6 +159,11 @@ async function main() {
 
   console.log(JSON.stringify({
     audit: "read-only Hablla card count; no sheet writes",
+    sheetDateParsed,
+    sheetCreationDateMinDay: sheetCards.reduce((min, card) => card.createdDay == null ? min : Math.min(min, card.createdDay), Infinity),
+    sheetCreationDateMaxDay: sheetCards.reduce((max, card) => card.createdDay == null ? max : Math.max(max, card.createdDay), -Infinity),
+    sheetUpdateDateMinDay: sheetCards.reduce((min, card) => card.updatedDay == null ? min : Math.min(min, card.updatedDay), Infinity),
+    sheetUpdateDateMaxDay: sheetCards.reduce((max, card) => card.updatedDay == null ? max : Math.max(max, card.updatedDay), -Infinity),
     createdAtFrom: cutoff.toISOString(),
     auditedAt: now.toISOString(),
     workspaceId: process.env.HABLLA_WORKSPACE_ID,
